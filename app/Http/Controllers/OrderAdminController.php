@@ -4,29 +4,26 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use Illuminate\Http\Request;
-
-
-$statuses = Order::getStatuses();
-$paymentMethods = Order::getPaymentMethods();
+use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 
 class OrderAdminController extends Controller
 {
-    // Status constants that match your actual database values
+    // These constants should match exactly what you want to store in the DB
     protected const ORDER_STATUSES = [
-        'Pending' => 'Pending',
-        'Completed' => 'Completed', 
-        'Cancelled' => 'Cancelled'
+        'pending' => 'Pending',
+        'processing' => 'Processing',
+        'delivered' => 'Delivered', 
+        'cancelled' => 'Cancelled'
     ];
 
-    // Payment methods that match your actual values
     protected const PAYMENT_METHODS = [
         'M-Pesa' => 'M-Pesa',
         'PayPal' => 'PayPal',
         'Credit Card' => 'Credit Card'
     ];
 
-    // Show all orders with pagination
-    public function index()
+    public function index(): View
     {
         $orders = Order::with(['user', 'items.product'])
                     ->latest()
@@ -35,8 +32,13 @@ class OrderAdminController extends Controller
         return view('admin.orders.index', compact('orders'));
     }
 
-    // Show form to edit order
-    public function edit(Order $order)
+    public function show(Order $order): View
+    {
+        $order->load(['user', 'items.product']);
+        return view('admin.orders.show', compact('order'));
+    }
+
+    public function edit(Order $order): View
     {
         $order->load(['user', 'items.product']);
         
@@ -47,31 +49,31 @@ class OrderAdminController extends Controller
         ]);
     }
 
-    // Update order
-    public function update(Request $request, Order $order)
+    public function update(Request $request, Order $order): RedirectResponse
     {
-        $validated = $request->validate([
-            'status' => 'required|string|in:' . implode(',', self::ORDER_STATUSES),
-            'payment_method' => 'required|string|in:' . implode(',', self::PAYMENT_METHODS),
+        // We validate against the KEYS of our array (pending, processing, etc.)
+        $request->validate([
+            'status' => 'required|string|in:' . implode(',', array_keys(self::ORDER_STATUSES)),
         ]);
 
-        $order->update($validated);
+        $order->update([
+            'status' => $request->status
+        ]);
 
         return redirect()->route('admin.orders.index')
-               ->with('success', 'Order updated successfully.');
+                         ->with('success', 'Order status updated successfully!');
     }
 
-    // Archive order
-    public function archive(Order $order)
+    public function archive(Order $order): RedirectResponse
     {
-        // Only allow archiving if status is Completed
-        if ($order->status !== 'Completed') {
-            return back()->with('error', 'Only completed orders can be archived.');
+        // Matching your logic: only archived if status is 'delivered' or 'completed'
+        // Adjust the string to match your DB casing
+        if (strtolower($order->status) !== 'delivered' && strtolower($order->status) !== 'completed') {
+            return back()->with('error', 'Only delivered or completed orders can be archived.');
         }
 
-        // Soft delete the order
-        $order->delete();
+        $order->delete(); // This assumes you are using SoftDeletes on your Order model
 
-        return back()->with('success', 'Order archived successfully.');
+        return redirect()->route('admin.orders.index')->with('success', 'Order archived successfully.');
     }
 }

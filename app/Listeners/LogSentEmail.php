@@ -7,23 +7,35 @@ use App\Models\Notification;
 
 class LogSentEmail
 {
+    /**
+     * Handle the event.
+     *
+     * @param  \Illuminate\Mail\Events\MessageSent  $event
+     * @return void
+     */
     public function handle(MessageSent $event)
     {
-        $message = $event->message;
+        $message = $event->sent->getOriginalMessage();
 
-        // Extract subject and to email(s)
+        // Extract subject
         $subject = $message->getSubject();
-        $to = implode(', ', array_keys($message->getTo()));
 
-        // Extract the body as string (simplified)
-        $body = $message->getBody();
+        // Extract "To" emails (handling the address objects)
+        $toAddresses = $message->getTo();
+        $to = implode(', ', array_map(fn($address) => $address->getAddress(), $toAddresses));
+
+        /**
+         * FIX: Extracting the body content as a string.
+         * Using getHtmlBody() or getTextBody() ensures we get the actual string content
+         * instead of the Symfony Part object.
+         */
+        $body = $message->getHtmlBody() ?: $message->getTextBody();
 
         // Store into your notifications table
         Notification::create([
             'to_email' => $to,
-            'subject' => $subject,
-            'body' => $body,
+            'subject'  => $subject,
+            'body'     => $body,
         ]);
     }
 }
-

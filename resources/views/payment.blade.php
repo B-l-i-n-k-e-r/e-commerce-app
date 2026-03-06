@@ -1,137 +1,122 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>M-Pesa STK Push</title>
-    <style>
-        /* Reset some default styles */
-        body, h2, p, ul, li, label, input, button {
-            margin: 0; padding: 0; box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        body {
-            background: #f4f7f9;
-            color: #333;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            min-height: 100vh;
-            padding: 40px 15px;
-        }
-        .container {
-            background: white;
-            padding: 30px 40px;
-            border-radius: 8px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-            max-width: 400px;
-            width: 100%;
-        }
-        h2 {
-            margin-bottom: 25px;
-            text-align: center;
-            color: #007c00; /* M-Pesa green */
-        }
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #555;
-        }
-        input[type="text"],
-        input[type="number"] {
-            width: 100%;
-            padding: 10px 12px;
-            margin-bottom: 20px;
-            border: 1.5px solid #ccc;
-            border-radius: 5px;
-            font-size: 16px;
-            transition: border-color 0.3s ease;
-        }
-        input[type="text"]:focus,
-        input[type="number"]:focus {
-            border-color: #007c00;
-            outline: none;
-        }
-        button {
-            width: 100%;
-            padding: 12px;
-            background-color: #007c00;
-            border: none;
-            border-radius: 6px;
-            color: white;
-            font-size: 18px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-            font-weight: 700;
-        }
-        button:hover {
-            background-color: #005f00;
-        }
-        .message {
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 6px;
-            font-weight: 600;
-            text-align: center;
-        }
-        .success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1.5px solid #c3e6cb;
-        }
-        .error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1.5px solid #f5c6cb;
-        }
-        ul {
-            list-style-type: disc;
-            padding-left: 20px;
-        }
-        @media (max-width: 480px) {
-            .container {
-                padding: 20px 25px;
-            }
-            button {
-                font-size: 16px;
-                padding: 10px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h2>M-Pesa Payment</h2>
+@extends('layouts.app')
 
-        @if (session('success'))
-            <p class="message success">{{ session('success') }}</p>
-        @elseif (session('error'))
-            <p class="message error">{{ session('error') }}</p>
-        @endif
-
-        @if ($errors->any())
-            <div class="message error">
-                <ul>
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
+@section('content')
+<div class="container mx-auto py-12 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-900 min-h-screen flex items-center justify-center">
+    <div class="max-w-md w-full">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-700">
+            
+            {{-- Header Section --}}
+            <div class="p-8 pb-0 text-center">
+                <div class="inline-flex items-center justify-center w-20 h-20 bg-green-50 dark:bg-green-900/20 rounded-2xl mb-4">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/1/15/M-PESA_LOGO-01.svg" alt="M-Pesa" class="w-12 h-12 object-contain">
+                </div>
+                <h2 class="text-2xl font-black text-gray-900 dark:text-white uppercase italic tracking-tighter">M-Pesa Payment</h2>
+                <p class="text-gray-500 dark:text-gray-400 font-bold text-sm mt-1">Order Ref: <span class="text-blue-600">#{{ $order->id }}</span></p>
             </div>
-        @endif
 
-        <form method="POST" action="{{ route('stkpush') }}">
-            @csrf
+            <div class="p-8">
+                @if ($errors->any())
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-xl">
+                        @foreach ($errors->all() as $error)
+                            <p class="text-red-700 text-xs font-bold">{{ $error }}</p>
+                        @endforeach
+                    </div>
+                @endif
 
-            <label for="phone">Phone Number (format 2547...):</label>
-            <input type="text" id="phone" name="phone" required value="{{ old('phone') }}" placeholder="e.g. 254712345678" />
+                {{-- Amount Summary (Fit Content Strategy) --}}
+                <div class="mb-8 overflow-x-auto">
+                    <table class="min-w-max w-full bg-gray-50 dark:bg-gray-900/50 rounded-xl">
+                        <tbody>
+                            <tr class="border-b dark:border-gray-800">
+                                <td class="py-4 px-6 text-xs font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Amount Due</td>
+                                <td class="py-4 px-6 text-xl font-black text-green-600 dark:text-green-400 text-right whitespace-nowrap">
+                                    KES {{ number_format($order->total_amount, 2) }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
-            <label for="amount">Amount (KES):</label>
-            <input type="number" id="amount" name="amount" required min="1" value="{{ old('amount') }}" placeholder="Enter amount to pay" />
+                {{-- Main Payment Form --}}
+                <form method="POST" action="{{ route('stkpush') }}" id="paymentForm" class="space-y-6">
+                    @csrf
+                    <input type="hidden" name="order_id" value="{{ $order->id }}">
 
-            <button type="submit">Pay with M-PESA</button>
-        </form>
+                    <div>
+                        <label for="phone" class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Phone Number</label>
+                        <input type="text" id="phone" name="phone" required 
+                               value="{{ $order->contact_number }}" 
+                               placeholder="2547XXXXXXXX"
+                               class="w-full px-5 py-4 rounded-2xl border-2 border-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:border-green-500 focus:ring-0 transition-all font-bold text-lg">
+                        <p class="text-[10px] text-gray-400 mt-2 font-medium italic">Enter the number that will receive the M-Pesa PIN prompt.</p>
+                    </div>
+
+                    {{-- Hidden Amount field for form submission --}}
+                    <input type="hidden" name="amount" value="{{ $order->total_amount }}">
+
+                    <button type="submit" class="w-full bg-[#007c00] hover:bg-[#005f00] text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-green-100 dark:shadow-none transition-all active:scale-95 flex items-center justify-center gap-3" id="payBtn">
+                        CONFIRM & PAY NOW
+                    </button>
+                </form>
+
+                {{-- Status Message --}}
+                <div id="pollingStatus" class="mt-6 text-center hidden">
+                    <div class="flex items-center justify-center gap-3 text-green-600 dark:text-green-400 animate-pulse font-black text-sm uppercase italic">
+                        <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        Waiting for PIN input...
+                    </div>
+                </div>
+
+                {{-- Cancel Action --}}
+                <div class="mt-8 pt-6 border-t dark:border-gray-700 text-center">
+                    <form method="POST" action="{{ route('order.cancel', $order->id) }}" class="inline">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="text-xs font-bold text-gray-400 hover:text-red-500 uppercase tracking-widest transition-colors">
+                            Cancel Order & Back to Cart
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <p class="text-center mt-6 text-[10px] text-gray-400 uppercase font-black tracking-widest">
+            🔒 Secured by Safaricom Daraja API
+        </p>
     </div>
-</body>
-</html>
+</div>
 
+{{-- Logic preserved exactly as requested --}}
+<script>
+    const orderId = "{{ $order->id }}";
+    const payBtn = document.getElementById('payBtn');
+    const statusMsg = document.getElementById('pollingStatus');
+    const paymentForm = document.getElementById('paymentForm');
+
+    paymentForm.addEventListener('submit', function(e) {
+        setTimeout(() => {
+            statusMsg.classList.remove('hidden');
+            payBtn.disabled = true;
+            payBtn.innerHTML = '<span class="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></span>Processing...';
+        }, 10);
+        
+        setTimeout(startPolling, 8000);
+    });
+
+    function startPolling() {
+        const checkStatus = setInterval(async () => {
+            try {
+                const response = await fetch(`/order/status/${orderId}`);
+                const data = await response.json();
+
+                if (data.status === 'completed' || data.status === 'paid' || data.status === 'success') {
+                    clearInterval(checkStatus);
+                    window.location.href = "{{ route('checkout.confirmation') }}?order_id=" + orderId;
+                }
+            } catch (error) {
+                console.error("Error checking status:", error);
+            }
+        }, 3000);
+    }
+</script>
+@endsection

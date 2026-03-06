@@ -11,33 +11,17 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class UserController extends Controller
 {
-    /**
-     * Display a listing of the users.
-     *
-     * @return \Illuminate\Http\Response
-     */
     public function index()
     {
         $users = User::paginate(10);
         return view('admin.users.index', compact('users'));
     }
 
-    /**
-     * Show the form for creating a new user.
-     *
-     * @return \Illuminate\Http\Response
-     */
     public function create()
     {
         return view('admin.users.create');
     }
 
-    /**
-     * Store a newly created user in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -50,33 +34,23 @@ class UserController extends Controller
             return redirect()->route('admin.users.create')->withErrors($validator)->withInput();
         }
 
-        $user = User::create([
+        User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'is_admin' => false,
+            'is_manager' => false,
         ]);
 
         return redirect()->route('admin.users.index')->with('success', 'User created successfully.');
     }
 
-    /**
-     * Display the specified user.
-     *
-     * @param  string  $id
-     * @return \Illuminate\Http\Response
-     */
     public function show($id)
     {
         $user = User::findOrFail($id);
         return view('admin.users.show', compact('user'));
     }
 
-    /**
-     * Show the form for editing the specified user.
-     *
-     * @param  string  $id
-     * @return \Illuminate\Http\Response
-     */
     public function edit($id)
     {
         try {
@@ -87,13 +61,6 @@ class UserController extends Controller
         return view('admin.users.edit', compact('user'));
     }
 
-    /**
-     * Update the specified user in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  string  $id
-     * @return \Illuminate\Http\Response
-     */
     public function update(Request $request, $id)
     {
         try {
@@ -122,16 +89,15 @@ class UserController extends Controller
         return redirect()->route('admin.users.index')->with('success', 'User updated successfully.');
     }
 
-    /**
-     * Remove the specified user from storage.
-     *
-     * @param  string  $id
-     * @return \Illuminate\Http\Response
-     */
     public function destroy($id)
     {
         try {
             $user = User::findOrFail($id);
+
+            // Prevent deleting yourself
+            if ($user->id === auth()->id()) {
+                return redirect()->route('admin.users.index')->with('error', 'You cannot delete your own administrative account.');
+            }
 
             if ($user->orders()->count() > 0) {
                 return redirect()->route('admin.users.index')->with('error', 'Cannot delete user. There are orders associated with this user.');
@@ -144,12 +110,6 @@ class UserController extends Controller
         }
     }
 
-    /**
-     * Verify the email of the specified user.
-     *
-     * @param  \App\Models\User  $user
-     * @return \Illuminate\Http\RedirectResponse
-     */
     public function verifyEmail(User $user)
     {
         if (!$user->hasVerifiedEmail()) {
@@ -161,31 +121,32 @@ class UserController extends Controller
     }
 
     /**
-     * Promote the specified user to admin.
-     *
-     * @param  string  $id
-     * @return \Illuminate\Http\RedirectResponse
+     * Promote to Administrator
+     * Matches route: admin.users.makeAdmin
      */
-    public function promoteToAdmin($id)
+    public function promoteToAdmin(User $user)
     {
-        try {
-            $user = User::findOrFail($id);
-        } catch (ModelNotFoundException $e) {
-            return redirect()->route('admin.users.index')->with('error', 'User not found.');
-        }
+        $user->update([
+            'is_admin' => true,
+            'is_manager' => true, // Admins inherit manager permissions
+        ]);
 
-        $user->is_admin = true;
-        $user->save();
-
-        return redirect()->route('admin.users.index')->with('success', 'User made admin.');
+        return back()->with('success', "Personnel {$user->name} has been promoted to Administrator.");
     }
 
-    public function makeAdmin(User $user)
-{
-    $user->is_admin = true;
-    $user->save();
+    /**
+     * Toggle Manager Role
+     */
+    public function toggleManager(User $user)
+    {
+        if ($user->is_admin) {
+            return redirect()->back()->with('error', 'Cannot downgrade an Admin via the Manager toggle.');
+        }
 
-    return redirect()->back()->with('success', 'User promoted to admin.');
-}
+        $user->is_manager = !$user->is_manager;
+        $user->save();
 
+        $roleStatus = $user->is_manager ? 'promoted to Manager' : 'reverted to User';
+        return redirect()->back()->with('success', "User {$user->name} has been {$roleStatus}.");
+    }
 }

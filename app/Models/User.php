@@ -23,6 +23,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'password',
         'profile_photo',
         'is_admin',
+        'is_manager',
     ];
 
     protected $hidden = [
@@ -65,5 +66,17 @@ class User extends Authenticatable implements MustVerifyEmail
         // CHANGE THIS LINE:
         $this->notify(new ResetPassword($token)); // Using Laravel's default ResetPassword notification
     }
+
+
+// Add these below your sendPasswordResetNotification method
+public function isAdmin(): bool
+{
+    return (bool) $this->is_admin;
+}
+
+public function isManager(): bool
+{
+    return (bool) $this->is_manager;
+}
 
 }

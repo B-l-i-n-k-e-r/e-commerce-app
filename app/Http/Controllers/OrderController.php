@@ -139,4 +139,5 @@ class OrderController extends Controller
 
         return redirect()->route('orders.index')->with('success', 'Order archived successfully.');
     }
+    
 }

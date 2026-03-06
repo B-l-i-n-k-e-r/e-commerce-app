@@ -1,65 +1,96 @@
 @extends('layouts.guest')
 
 @section('content')
-    <!-- Session Status -->
-    <x-auth-session-status class="mb-4" :status="session('status')" />
-
-    <div class="max-w-md mx-auto p-6 bg-white shadow-md rounded-lg dark:bg-gray-800">
-        <h2 class="text-2xl font-semibold text-center mb-6 text-gray-800 dark:text-gray-100">
-            {{ __('Login to Your Account') }}
-        </h2>
-
-        <form method="POST" action="{{ route('login') }}">
-            @csrf
-
-            <!-- Email Address -->
-            <div>
-                <x-input-label for="email" :value="__('Email')" />
-                <x-text-input id="email" class="block mt-1 w-full" type="email" name="email"
-                              :value="old('email')" required autofocus autocomplete="username" />
-                <x-input-error :messages="$errors->get('email')" class="mt-2" />
+    <div class="min-h-screen flex flex-col justify-center py-12 px-6 lg:px-8 bg-gray-50 dark:bg-gray-950">
+        
+        <div class="sm:mx-auto sm:w-full sm:max-w-md mb-8 text-center">
+            <div class="inline-flex items-center gap-2 mb-4">
+                <div class="w-10 h-10 bg-blue-600 rounded-2xl rotate-12 flex items-center justify-center shadow-lg shadow-blue-600/20">
+                    <span class="text-white font-black text-sm -rotate-12">B</span>
+                </div>
             </div>
+            <h2 class="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400 dark:text-gray-500">
+                Authentication Portal
+            </h2>
+        </div>
 
-            <!-- Password -->
-            <div class="mt-4">
-                <x-input-label for="password" :value="__('Password')" />
-                <x-text-input id="password" class="block mt-1 w-full"
-                              type="password" name="password" required autocomplete="current-password" />
-                <x-input-error :messages="$errors->get('password')" class="mt-2" />
-            </div>
+        <div class="sm:mx-auto sm:w-full sm:max-w-[440px]">
+            <x-card title="Welcome Back" subtitle="Access your BokinceX dashboard">
+                
+                <x-auth-session-status class="mb-6 text-[10px] font-bold uppercase tracking-widest text-green-600" :status="session('status')" />
 
-            <!-- Remember Me -->
-            <div class="block mt-4">
-                <label for="remember_me" class="flex items-center">
-                    <input id="remember_me" type="checkbox"
-                           class="rounded border-gray-300 dark:border-gray-700 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:focus:ring-indigo-600 dark:focus:ring-offset-gray-800"
-                           name="remember">
-                    <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">{{ __('Remember me') }}</span>
-                </label>
-            </div>
+                <form method="POST" action="{{ route('login') }}" class="space-y-6">
+                    @csrf
 
-            <!-- Actions -->
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-6 gap-4">
-                @if (Route::has('password.request'))
-                    <a class="text-sm text-indigo-600 hover:underline dark:text-indigo-400" href="{{ route('password.request') }}">
-                        {{ __('Forgot your password?') }}
-                    </a>
-                @endif
+                    <div class="space-y-2">
+                        <label for="email" class="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">
+                            Identification
+                        </label>
+                        <input 
+                            id="email" 
+                            name="email" 
+                            type="email" 
+                            :value="old('email')" 
+                            required 
+                            autofocus 
+                            placeholder="email@example.com"
+                            class="w-full bg-gray-50 dark:bg-gray-800/50 border-none rounded-2xl py-4 px-5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 transition-all {{ $errors->has('email') ? 'ring-2 ring-red-500' : '' }}"
+                        >
+                        <x-input-error :messages="$errors->get('email')" class="mt-2 text-[10px] font-bold uppercase" />
+                    </div>
 
-                <x-primary-button class="w-full sm:w-auto">
-                    {{ __('Log in') }}
-                </x-primary-button>
-            </div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center px-1">
+                            <label for="password" class="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                                Security Code
+                            </label>
+                            @if (Route::has('password.request'))
+                                <a class="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-500 transition-colors" href="{{ route('password.request') }}">
+                                    Reset
+                                </a>
+                            @endif
+                        </div>
+                        <input 
+                            id="password" 
+                            name="password" 
+                            type="password" 
+                            required 
+                            placeholder="••••••••"
+                            class="w-full bg-gray-50 dark:bg-gray-800/50 border-none rounded-2xl py-4 px-5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 transition-all {{ $errors->has('password') ? 'ring-2 ring-red-500' : '' }}"
+                        >
+                        <x-input-error :messages="$errors->get('password')" class="mt-2 text-[10px] font-bold uppercase" />
+                    </div>
 
-            <!-- Register Prompt -->
-            <div class="text-center mt-6">
-                <p class="text-sm text-gray-500 dark:text-gray-400">
-                    {{ __("Don't have an account?") }}
-                    <a href="{{ route('register') }}" class="text-indigo-600 hover:underline dark:text-indigo-400">
-                        {{ __('Register here') }}
-                    </a>
-                </p>
-            </div>
-        </form>
+                    <div class="flex items-center justify-between px-1">
+                        <label for="remember_me" class="inline-flex items-center cursor-pointer group">
+                            <input 
+                                id="remember_me" 
+                                type="checkbox" 
+                                name="remember"
+                                class="rounded-lg bg-gray-100 dark:bg-gray-800 border-none text-blue-600 shadow-sm focus:ring-blue-600 focus:ring-offset-0 transition-all"
+                            >
+                            <span class="ml-3 text-[10px] font-black text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 uppercase tracking-widest transition-colors">
+                                Persistent Session
+                            </span>
+                        </label>
+                    </div>
+
+                    <div class="pt-2">
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black uppercase tracking-widest py-5 rounded-2xl shadow-xl shadow-blue-600/20 transition-all active:scale-[0.98]">
+                            Establish Connection
+                        </button>
+                    </div>
+
+                    <div class="text-center pt-4">
+                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-loose">
+                            New to the collective? <br>
+                            <a href="{{ route('register') }}" class="text-blue-600 hover:text-blue-500 transition-colors underline underline-offset-4">
+                                Create an account
+                            </a>
+                        </p>
+                    </div>
+                </form>
+            </x-card>
+        </div>
     </div>
 @endsection

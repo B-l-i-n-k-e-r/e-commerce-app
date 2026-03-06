@@ -19,8 +19,10 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\MailtrapController;
-use App\Services\MailtrapService;
-
+use App\Http\Controllers\PHPMailerController;
+use App\Http\Controllers\Auth\NewPasswordController;
+use App\Http\Controllers\Auth\PasswordResetLinkController;
+use App\Http\Controllers\Manager\ManagerDashboardController;
 
 // ========================= M-PESA ROUTES =========================
 Route::get('/mpesa/test-token', [MpesaController::class, 'getAccessToken']);
@@ -46,16 +48,14 @@ Route::prefix('cart')->name('cart.')->group(function () {
 // ========================= AUTH ROUTES =========================
 Auth::routes(['verify' => true]);
 
-// ========================= PASSWORD RESET ROUTES (GUEST-ONLY) =========================
+// ========================= PASSWORD RESET ROUTES =========================
+// Fixed: Ensure these are outside restricted middleware so users can access them while logged out
+Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])->name('password.reset');
+
 Route::middleware('guest')->group(function () {
-    Route::get('forgot-password', [\App\Http\Controllers\Auth\PasswordResetLinkController::class, 'create'])
-        ->name('password.request');
-    Route::post('forgot-password', [\App\Http\Controllers\Auth\PasswordResetLinkController::class, 'store'])
-        ->name('password.email');
-    Route::get('reset-password/{token}', [\App\Http\Controllers\Auth\NewPasswordController::class, 'create'])
-        ->name('password.reset');
-    Route::post('reset-password', [\App\Http\Controllers\Auth\NewPasswordController::class, 'store'])
-        ->name('password.update');
+    Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
+    Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])->name('password.email');
+    Route::post('reset-password', [NewPasswordController::class, 'store'])->name('password.store');
 });
 
 // ========================= AUTHENTICATED USER ROUTES =========================
@@ -63,7 +63,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/home', [HomeController::class, 'index'])->name('home');
 
-    // ===== Profile Routes =====
+    // Profile
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -71,83 +71,72 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/profile/notifications', [ProfileController::class, 'updateNotifications'])->name('profile.update.notifications');
     Route::post('/profile/photo', [ProfileController::class, 'updatePhoto'])->name('profile.update.photo');
 
-    // ===== Checkout Routes =====
+    // Checkout
     Route::get('/checkout', [CheckoutController::class, 'showCheckout'])->name('checkout.view');
     Route::post('/checkout/createOrder', [CheckoutController::class, 'createOrder'])->name('checkout.createOrder');
     Route::post('/checkout/process', function () {
         return view('orders.confirmation');
     })->name('checkout.process.order');
-    Route::get('/checkout/confirmation', [CheckoutController::class, 'showConfirmation'])->name('checkout.confirmation');
-
-    // ===== Payment Routes =====
+    Route::get('/checkout/confirmation/{order_id?}', [CheckoutController::class, 'showConfirmation'])->name('checkout.confirmation');
+    Route::get('/order/status/{order_id}', [CheckoutController::class, 'checkStatus'])->name('order.status');
+    Route::delete('/order/cancel/{order_id}', [CheckoutController::class, 'cancelOrder'])->name('order.cancel');
+    
+    // Payment
     Route::get('/payment/{order_id}', [PaymentController::class, 'showPaymentPage'])->name('payment.method');
     Route::post('/payment/{order_id}', [PaymentController::class, 'processPayment'])->name('payment.process');
     Route::get('/order-confirmation/{order_id}', [PaymentController::class, 'confirmOrder'])->name('order.confirmation');
 
-    // ===== Email Verification =====
-    Route::post('/email/verification-notification', [VerificationController::class, 'resend'])->name('verification.send');
-
-    // ===== Order Viewing =====
-    Route::get('/orders/{order}', [OrderController::class, 'show'])->name('order.show');
+    // Order Viewing (For Customers)
     Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
     Route::get('/orders/confirmation', [CheckoutController::class, 'showConfirmation'])->name('orders.confirmation');
+    Route::get('/orders/{order}', [OrderController::class, 'show'])->name('order.show');
 
-    // ===== Notifications =====
+    // Notifications
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
     Route::post('/notifications/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-as-read');
 });
 
-// ========================= ADMIN ROUTES =========================
+// ========================= ADMIN & MANAGER ROUTES =========================
 Route::middleware(['auth'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
         Route::get('/', [AdminController::class, 'index'])->name('dashboard');
-        Route::post('/profile/photo', [ProfileController::class, 'updatePhoto'])->name('profile.update.photo');
         
-        // ===== Product Management =====
+        // Product Management
         Route::resource('products', ProductAdminController::class);
         Route::get('product-listing', [ProductAdminController::class, 'index'])->name('admin.product.listing');
 
-        // ===== Order Management =====
+        // Order Management
         Route::resource('orders', OrderAdminController::class);
         Route::patch('/orders/{order}/archive', [OrderAdminController::class, 'archive'])->name('orders.archive');
 
-        // ===== Report Management =====
-        Route::get('reports', [ReportController::class, 'index'])->name('reports');
-        Route::get('reports/export', [ReportController::class, 'export'])->name('reports.export');
-
-        // ===== User Management =====
+        // User Management
         Route::resource('users', UserController::class);
         Route::post('/users/{user}/verify', [UserController::class, 'verifyEmail'])->name('users.verify');
         Route::post('/users/{user}/makeAdmin', [UserController::class, 'promoteToAdmin'])->name('users.makeAdmin');
+        Route::post('/users/{user}/toggleManager', [UserController::class, 'toggleManager'])->name('users.toggleManager');
 
-        // ===== Password Reset Requests Management =====
+        // Reports & Misc
+        Route::get('reports', [ReportController::class, 'index'])->name('reports');
+        Route::get('reports/export', [ReportController::class, 'export'])->name('reports.export');
         Route::get('/password-requests', [AdminController::class, 'showPasswordRequests'])->name('password.requests');
         Route::post('/password-requests/{user}/approve', [AdminController::class, 'approvePasswordRequest'])->name('password.requests.approve');
         Route::post('/password-requests/{user}/reject', [AdminController::class, 'rejectPasswordRequest'])->name('password.requests.reject');
+        Route::get('inventory/low-stock', [ProductAdminController::class, 'lowStock'])->name('inventory.low-stock');
     });
 
-// ========================= FALLBACK ROUTE (404) =========================
-Route::fallback(function () {
-    return response()->view('errors.404', [], 404);
+// ========================= MANAGER SPECIFIC =========================
+Route::middleware(['auth', 'manager'])->group(function () {
+    Route::get('/manager/dashboard', [ManagerDashboardController::class, 'index'])->name('manager.dashboard');
 });
 
-// ========================= TRANSACTION CONFIRMATION =========================
+// ========================= EXTERNAL & UTILITY =========================
 Route::post('/confirm-transaction', [TransactionController::class, 'confirmTransaction'])->name('confirm.transaction');
+Route::get('/test-phpmailer', [PHPMailerController::class, 'testMail']);
 
-
-// Route that returns Mailtrap inbox messages as JSON (API-style)
-Route::get('/api/mailtrap/inbox', function (MailtrapService $mailtrapService) {
-    $messages = $mailtrapService->fetchInboxMessages();
-    return response()->json($messages);
-})->name('mailtrap.api.inbox');
-
-// Route that returns a Blade view showing the inbox messages nicely formatted
-Route::get('/mailtrap/inbox', [MailtrapController::class, 'inbox'])->name('mailtrap.inbox');
-
-Route::middleware(['auth', 'admin'])->group(function() {
-    Route::get('/admin/password/reset/{user}', [AdminController::class, 'approvePasswordReset'])
-         ->name('admin.password.reset.approve');
+// ========================= FALLBACK (ALWAYS LAST) =========================
+Route::fallback(function () {
+    return response()->view('errors.404', [], 404);
 });

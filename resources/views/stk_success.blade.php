@@ -3,113 +3,167 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>STK Push Processing</title>
+    <title>BokinceX_Receipt_#{{ $order->id }}</title>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f2f2f2;
-            margin: 0;
-            padding: 40px 0;
-            display: flex;
-            justify-content: center;
+        /* Professional thermal receipt typography */
+        body { 
+            background-color: #e0e0e0; 
+            font-family: 'Courier New', Courier, monospace; 
+            padding: 40px 15px; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            color: #000;
         }
 
-        .container {
-            background-color: white;
-            border-radius: 12px;
-            padding: 30px;
+        .receipt-container { 
+            background-color: white; 
+            width: 80mm; 
+            padding: 12mm 6mm; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            box-sizing: border-box; 
+            position: relative;
+        }
+
+        /* Thermal receipt "cut" effect */
+        .receipt-container::after {
+            content: "";
+            position: absolute;
+            bottom: -5px;
+            left: 0;
             width: 100%;
-            max-width: 600px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            height: 10px;
+            background: linear-gradient(-135deg, white 5px, transparent 0) 0 5px, 
+                        linear-gradient(135deg, white 5px, transparent 0) 0 5px;
+            background-size: 10px 10px;
         }
 
-        h1 {
-            color: #fd7e14;
-            font-size: 24px;
-            margin-bottom: 10px;
-            text-align: center;
+        .text-center { text-align: center; }
+        .dashed-line { border-top: 1px dashed #000; margin: 12px 0; }
+        .bold { font-weight: bold; }
+        .uppercase { text-transform: uppercase; }
+
+        .items-table { 
+            width: 100%; 
+            font-size: 13px; 
+            border-collapse: collapse; 
+            margin: 15px 0;
         }
 
-        p {
-            margin: 8px 0;
-            line-height: 1.5;
+        /* Fit content strategy: Qty and Total stay on one line, Item name can wrap */
+        .items-table th, .items-table td { 
+            padding: 4px 0; 
+            vertical-align: top;
         }
 
-        .manual-confirmation {
-            margin-top: 25px;
-            border: 1px dashed #aaa;
-            padding: 20px;
-            border-radius: 8px;
-            background-color: #fcfcfc;
+        .col-item { text-align: left; white-space: normal; word-break: break-word; }
+        .col-qty { text-align: center; white-space: nowrap; width: 1%; padding: 4px 8px; }
+        .col-total { text-align: right; white-space: nowrap; width: 1%; }
+
+        .items-table th { 
+            border-bottom: 1px solid #000; 
+            font-size: 11px;
+            text-transform: uppercase;
         }
 
-        .manual-confirmation h2 {
-            margin-top: 0;
-            color: #333;
-        }
-
-        textarea {
-            width: 100%;
-            padding: 12px;
-            font-size: 14px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-            margin-top: 10px;
-            resize: none;
-            box-sizing: border-box;
-        }
-
-        button {
+        .total-section {
+            font-size: 16px;
             margin-top: 15px;
-            padding: 12px 20px;
-            font-weight: bold;
-            background-color: #28a745;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
+            border-top: 2px solid #000;
+            padding-top: 10px;
         }
 
-        button:hover {
-            background-color: #218838;
+        .no-print { 
+            margin-top: 30px; 
+            display: flex; 
+            gap: 15px; 
+            font-family: sans-serif;
         }
 
-        .transaction-info {
-            margin-top: 25px;
-            background-color: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            border-left: 5px solid #007bff;
+        .btn { 
+            padding: 12px 24px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: 800; 
+            text-decoration: none; 
+            color: white; 
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            font-size: 13px;
         }
 
-        .transaction-info p {
-            margin: 5px 0;
-        }
+        .btn-print { background: #1a1a1a; box-shadow: 0 4px 0 #000; }
+        .btn-print:active { transform: translateY(2px); box-shadow: 0 2px 0 #000; }
+        
+        .btn-confirm { background: #007c00; box-shadow: 0 4px 0 #004d00; }
+        .btn-confirm:active { transform: translateY(2px); box-shadow: 0 2px 0 #004d00; }
 
-        strong {
-            font-weight: 600;
+        @media print { 
+            .no-print { display: none; } 
+            body { background: white; padding: 0; } 
+            .receipt-container { 
+                width: 80mm; 
+                box-shadow: none; 
+                margin: 0; 
+                padding: 5mm;
+            } 
+            .receipt-container::after { display: none; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Transaction Processing...</h1>
-        <p style="text-align: center;">A request has been sent to your phone. Please enter your M-Pesa PIN.</p>
 
-        <div class="manual-confirmation">
-            <h2>Enter M-Pesa Confirmation Message</h2>
-            <!-- Wrap textarea and button in a form -->
-            <form method="POST" action="{{ route('confirm.transaction') }}">
-    @csrf
-    <textarea name="mpesaMessage" rows="4" placeholder="Paste M-Pesa confirmation message here" required>{{ old('mpesaMessage') }}</textarea>
-    @error('mpesaMessage')
-        <div style="color: red;">{{ $message }}</div>
-    @enderror
-    <button type="submit">Submit Confirmation</button>
-</form>
+    <div class="receipt-container">
+        <div class="text-center">
+            <h1 style="margin: 0; font-size: 22px; letter-spacing: -1px;">BOKINCEX STORE</h1>
+            <p style="margin: 5px 0; font-size: 12px; font-weight: bold;">*** OFFICIAL RECEIPT ***</p>
+            <div class="dashed-line"></div>
+        </div>
 
+        <div style="font-size: 12px; line-height: 1.6;">
+            <p style="margin: 0;">TXN: <span class="bold">#{{ $order->id }}</span></p>
+            <p style="margin: 0;">DATE: {{ $order->created_at->format('d/m/Y H:i') }}</p>
+            <p style="margin: 0;">CUST: {{ $order->shipping_name ?? $order->name }}</p>
+        </div>
+        
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th class="col-item">DESCRIPTION</th>
+                    <th class="col-qty">QTY</th>
+                    <th class="col-total">TOTAL</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($order->items as $item)
+                <tr>
+                    <td class="col-item uppercase">{{ $item->product->name }}</td>
+                    <td class="col-qty">{{ $item->quantity }}</td>
+                    <td class="col-total">{{ number_format($item->price * $item->quantity, 2) }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+
+        <div class="total-section text-center">
+            <p class="bold uppercase" style="margin: 0;">TOTAL PAID</p>
+            <p class="bold" style="font-size: 24px; margin: 5px 0;">KES {{ number_format($order->total_amount, 2) }}</p>
+        </div>
+
+        <div class="dashed-line"></div>
+        
+        <div class="text-center" style="font-size: 11px; margin-top: 10px; line-height: 1.5;">
+            <p>PAYMENT: <span class="bold">{{ strtoupper($order->payment_method) }}</span></p>
+            <p style="margin-top: 10px; font-style: italic;">Thank you for your business!</p>
+            <p class="bold" style="margin-top: 5px;">WWW.BOKINCEX.CO.KE</p>
         </div>
     </div>
+
+    <div class="no-print">
+        <button onclick="window.print()" class="btn btn-print">Print Receipt</button>
+        <a href="{{ route('checkout.confirmation', ['order_id' => $order->id]) }}" class="btn btn-confirm">Finish & Confirm</a>
+    </div>
+
 </body>
 </html>

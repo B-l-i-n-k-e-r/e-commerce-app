@@ -1,77 +1,114 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="py-12">
+    <div class="py-12 bg-gray-50 dark:bg-gray-900 min-h-screen">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            
+            {{-- Top Row: Welcome & Recent Orders --}}
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+                
                 {{-- Welcome Widget --}}
-                <div class="overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="p-6 text-gray-100">
-                        <h3 class="text-gray-900 font-semibold text-lg mb-9">{{ __('Welcome🤗, :name!', ['name' => Auth::user()->name]) }}</h3>
-                        <p class="text-gray-900">{{ __("Feel free to explore all products offered with BokinceX. Here's a quick overview:") }}</p>
+                <div class="lg:col-span-1 bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-2xl border border-gray-100 dark:border-gray-700">
+                    <div class="p-8">
+                        <div class="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mb-6">
+                            <span class="text-3xl">🤗</span>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                            {{ __('Hello, :name!', ['name' => Auth::user()->name]) }}
+                        </h3>
+                        <p class="text-gray-600 dark:text-gray-400 leading-relaxed">
+                            {{ __("Welcome back to BokinceX. Ready to find something amazing today?") }}
+                        </p>
+                        <div class="mt-8">
+                            <a href="{{ route('products.index') }}" class="inline-flex items-center text-blue-600 dark:text-blue-400 font-bold hover:underline">
+                                {{ __('Browse Catalog') }}
+                                <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                            </a>
+                        </div>
                     </div>
                 </div>
 
                 {{-- Recent Orders Widget --}}
-                @if ($recentOrders->isNotEmpty())
-                    <div class="overflow-hidden shadow-sm sm:rounded-lg">
-                        <div class="p-6 text-gray-100">
-                            <h2 class="text-gray-900 font-semibold text-xl mb-4">{{ __('Recent Orders') }}</h2>
-                            <ul>
-                                @foreach ($recentOrders as $order)
-                                    <li class="text-gray-900 py-2 border-b border-gray-700 last:border-b-0">
-                                        {{ __('Order') }}: <span class="font-semibold">{{ $order->order_number ?? $order->id }}</span>
-                                        <br>
-                                        {{ __('Date') }}: <span class="text-blue-500">{{ $order->created_at->format('M d, Y') }}</span>
-                                        <br>
-                                        {{ __('Status') }}: <span class="{{ $order->status === 'shipped' ? 'text-green-700' : ($order->status === 'processing' ? 'text-yellow-800' : 'text-red-400') }}">{{ ucfirst($order->status) }}</span>
-                                        <a href="{{ route('order.show', $order->id) }}" class="text-green-600 hover:underline text-sm ml-2">{{ __('View Details') }}</a>
-                                    </li>
-                                @endforeach
-                            </ul>
-                            @if ($recentOrders->count() > 3)
-                                <div class="mt-4 text-center">
-                                    <a href="{{ route('orders.index') }}" class="text-blue-500 hover:underline text-sm">{{ __('View All Orders') }}</a>
-                                </div>
-                            @endif
-                            {{-- "Show All Orders" Button below the list --}}
+                <div class="lg:col-span-2 bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-2xl border border-gray-100 dark:border-gray-700">
+                    <div class="p-8">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ __('Your Recent Orders') }}</h2>
                             @if ($recentOrders->isNotEmpty())
-                                <div class="mt-4 text-center">
-                                    <a href="{{ route('orders.index') }}" class="inline-flex items-center px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-md transition-colors duration-200 text-sm">
-                                        {{ __('Show All') }}
-                                    </a>
-                                </div>
+                                <a href="{{ route('orders.index') }}" class="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800">
+                                    {{ __('View All') }}
+                                </a>
                             @endif
                         </div>
+
+                        @if ($recentOrders->isNotEmpty())
+                            <div class="space-y-4">
+                                @foreach ($recentOrders->take(3) as $order)
+                                    <div class="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600">
+                                        <div class="flex items-center gap-4">
+                                            <div class="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+                                                <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                                            </div>
+                                            <div>
+                                                <p class="font-bold text-gray-900 dark:text-white">#{{ $order->order_number ?? $order->id }}</p>
+                                                <p class="text-xs text-gray-500">{{ $order->created_at->format('M d, Y') }}</p>
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <span class="block text-xs font-bold uppercase tracking-wider mb-1 {{ $order->status === 'delivered' ? 'text-green-600' : ($order->status === 'processing' ? 'text-yellow-600' : 'text-blue-600') }}">
+                                                {{ $order->status }}
+                                            </span>
+                                            <a href="{{ route('order.show', $order->id) }}" class="text-sm text-blue-600 font-medium hover:underline">{{ __('Details') }}</a>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="text-center py-8">
+                                <p class="text-gray-500 dark:text-gray-400 italic">{{ __('No recent orders found.') }}</p>
+                            </div>
+                        @endif
                     </div>
-                @endif
+                </div>
             </div>
 
             {{-- Featured Products Section --}}
-            <div class="mt-8 text-gray-900 overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 text-gray-900">
-                    <h2 class="font-semibold text-xl mb-4">{{ __('🔥Featured Products') }}</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        @foreach ($products->take(6) as $product)
-                            <div class="bg-gray-700 rounded-md shadow-md overflow-hidden">
-                                <div class="relative h-32">
-                                    @if($product->image_url)
-                                        <img src="{{ asset($product->image_url) }}" alt="{{ $product->name }}" class="w-full h-full object-cover rounded-t-md">
-                                    @else
-                                        <img src="{{ asset('images/no-image-placeholder.jpg') }}" alt="No Image" class="w-full h-full object-cover rounded-t-md">
-                                    @endif
+            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+                <div class="p-8">
+                    <div class="flex items-center gap-2 mb-8">
+                        <span class="text-2xl">🔥</span>
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('Featured Products') }}</h2>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        @foreach ($products->take(8) as $product)
+                            <div class="group bg-gray-50 dark:bg-gray-700/30 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-600 hover:shadow-md transition-all duration-300">
+                                <div class="relative aspect-square overflow-hidden bg-gray-200">
+                                    <img src="{{ $product->image_url ? asset($product->image_url) : asset('images/no-image-placeholder.jpg') }}" 
+                                         alt="{{ $product->name }}" 
+                                         class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
                                 </div>
-                                <div class="p-4 text-center">
-                                    <h5 class="text-lg font-semibold text-gray-200 mb-2">{{ $product->name }}</h5>
-                                    <p class="text-gray-400 text-sm">{{ Str::limit($product->description, 50) }}</p>
-                                    <p class="text-green-400 font-bold mt-2">${{ number_format($product->price, 2) }}</p>
+                                <div class="p-5">
+                                    <h5 class="font-bold text-gray-900 dark:text-white truncate mb-1">{{ $product->name }}</h5>
+                                    <p class="text-gray-500 dark:text-gray-400 text-xs mb-3 line-clamp-2">
+                                        {{ $product->description }}
+                                    </p>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-lg font-black text-green-600 dark:text-green-400 whitespace-nowrap">
+                                            Ksh {{ number_format($product->price, 2) }}
+                                        </span>
+                                        <a href="{{ route('products.index') }}" class="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         @endforeach
                     </div>
-                    <div class="mt-6 text-center">
-                        <a href="{{ route('products.index') }}" class="inline-flex items-center px-6 py-3 bg-blue-500 hover:bg-green-600 text-white font-semibold rounded-md transition-colors duration-200">
-                            {{ __('Go Shopping🛍️') }}
+
+                    <div class="mt-12 text-center">
+                        <a href="{{ route('products.index') }}" class="inline-flex items-center px-10 py-4 bg-gray-900 dark:bg-white dark:text-gray-900 text-white font-black rounded-xl hover:scale-105 transition-all duration-200 shadow-lg">
+                            <span class="mr-2">🛍️</span>
+                            {{ __('GO SHOPPING') }}
                         </a>
                     </div>
                 </div>

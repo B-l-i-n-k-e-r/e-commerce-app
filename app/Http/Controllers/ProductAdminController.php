@@ -127,4 +127,10 @@ class ProductAdminController extends Controller
             return redirect()->route('admin.products.index')->with('Make sure you archive your order and try again!!!.');
         }
     }
+
+    public function lowStock()
+{
+    $products = Product::where('stock', '<', 10)->get();
+    return view('admin.products.low_stock', compact('products'));
+}
 }

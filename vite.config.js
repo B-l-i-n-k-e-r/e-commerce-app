@@ -11,4 +11,11 @@ export default defineConfig({
             refresh: true,
         }),
     ],
+    css: {
+        preprocessorOptions: {
+            scss: {
+                quietDeps: true, // This hides the warnings from node_modules
+            },
+        },
+    },
 });

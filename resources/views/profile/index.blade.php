@@ -1,39 +1,52 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-lg-6">
-            <div class="card shadow-lg">
-                <div class="card-body text-center">
-                    <div class="mb-6">
-                        <div class="profile-photo-container mx-auto mb-4">
-                            <img src="{{ $user->profile_photo_url }}"
-                                 alt="Profile Photo"
-                                 width="150"
-                                 height="150"
-                                 class="rounded-circle border-3 border-white shadow-md">
-                        </div>
+<div class="flex items-center justify-center min-h-[calc(100vh-200px)]">
+    <div class="w-full max-w-md">
+        <div class="bg-white dark:bg-gray-900 shadow-2xl rounded-3xl overflow-hidden border border-gray-100 dark:border-gray-800 transition-all duration-300">
+            
+            <div class="h-24 bg-gradient-to-r from-blue-600 to-indigo-700"></div>
 
-                        <h2 class="text-3xl font-semibold mb-2 text-blue-800">
-                            {{ $user->name }}
-                        </h2>
-                        <p class="text-yellow-200 text-lg">
-                            {{ $user->email }}
-                        </p>
+            <div class="px-8 pb-8">
+                <div class="relative text-center">
+                    <div class="relative -mt-12 mb-4 inline-block">
+                        <img src="{{ $user->profile_photo_url }}" 
+                             alt="{{ $user->name }}" 
+                             class="h-24 w-24 rounded-2xl object-cover ring-4 ring-white dark:ring-gray-900 shadow-lg mx-auto">
+                        <div class="absolute bottom-0 right-0 h-4 w-4 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full" title="Online"></div>
                     </div>
 
-                    <div class="mb-4">
-                        <a href="{{ route('profile.edit') }}"
-                           class="btn btn-primary bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2.5 px-5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors duration-200">
-                            Edit Profile
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+                        {{ $user->name }}
+                    </h2>
+                    <p class="text-gray-500 dark:text-gray-400 font-medium mb-6">
+                        {{ $user->email }}
+                    </p>
+
+                    <div class="mb-8">
+                        @if($user->is_admin)
+                            <span class="px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-black uppercase tracking-widest rounded-full">System Administrator</span>
+                        @elseif($user->is_manager)
+                            <span class="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-black uppercase tracking-widest rounded-full">Manager</span>
+                        @else
+                            <span class="px-3 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs font-black uppercase tracking-widest rounded-full">Customer</span>
+                        @endif
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-3">
+                        <a href="{{ route('profile.edit') }}" 
+                           class="flex items-center justify-center gap-2 bg-gray-900 dark:bg-blue-600 hover:bg-gray-800 dark:hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-2xl transition-all active:scale-95 shadow-lg shadow-blue-500/20">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            Edit Account Settings
                         </a>
                     </div>
 
                     @if(session('success'))
-                        <div class="alert alert-success mt-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
-                            <strong class="font-bold">Success!</strong>
-                            <span class="block sm:inline">{{ session('success') }}</span>
+                        <div class="mt-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 rounded-2xl animate-bounce">
+                            <div class="flex items-center gap-2 text-green-700 dark:text-green-400 text-sm font-bold">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                Profile Updated!
+                            </div>
                         </div>
                     @endif
                 </div>
@@ -42,122 +55,3 @@
     </div>
 </div>
 @endsection
-
-@push('styles')
-    <style>
-        main {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: calc(100vh - /* Adjust this value based on your navigation bar's height */ );
-        }
-    </style>
-@endpush
-
-<style>
-    .profile-photo-container {
-        position: relative;
-        display: inline-flex;
-    }
-
-    .border-3 {
-        border-width: 3px;
-    }
-
-    .border-white {
-        border-color: white;
-    }
-
-    .shadow-lg {
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    }
-
-    .rounded-circle {
-        border-radius: 50%;
-    }
-
-    .text-3xl {
-        font-size: 1.875rem;
-        line-height: 2.25rem;
-    }
-
-    .font-semibold {
-        font-weight: 600;
-    }
-
-    .mb-2 {
-        margin-bottom: 0.5rem;
-    }
-
-    .text-blue-800 {
-        --tw-text-opacity: 1;
-        color: rgba(30, 58, 138, var(--tw-text-opacity));
-    }
-
-    .text-yellow-200 {
-        --tw-text-opacity: 1;
-        color: rgba(254, 240, 138, var(--tw-text-opacity));
-    }
-
-    .bg-blue-500 {
-        --tw-bg-opacity: 1;
-        background-color: rgba(59, 130, 246, var(--tw-bg-opacity));
-    }
-
-    .hover\:bg-blue-600:hover {
-        --tw-bg-opacity: 1;
-        background-color: rgba(48, 100, 230, var(--tw-bg-opacity));
-    }
-
-    .text-white {
-        --tw-text-opacity: 1;
-        color: #fff;
-    }
-
-    .font-semibold {
-        font-weight: 600;
-    }
-
-    .py-2\.5 {
-        padding-top: 0.75rem;
-        padding-bottom: 0.75rem;
-    }
-
-    .px-5 {
-        padding-left: 1.25rem;
-        padding-right: 1.25rem;
-    }
-
-    .rounded-lg {
-        border-radius: 0.5rem;
-    }
-
-    .focus\:outline-none:focus {
-        outline: 2px solid transparent;
-        outline-offset: 2px;
-    }
-
-    .focus\:ring-2:focus {
-        --tw-ring-inset: var(--tw-empty, /*!*/);
-        --tw-ring-offset-width: 0px;
-        --tw-ring-offset-color: #fff;
-        --tw-ring-color: rgba(59, 130, 246, var(--tw-ring-opacity));
-        --tw-ring-offset-shadow: 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
-        --tw-ring-shadow: 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color);
-        box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), 0 0 0 var(--tw-shadow-sm);
-    }
-
-    .focus\:ring-opacity-50:focus {
-        --tw-ring-opacity: 0.5;
-    }
-
-    .transition-colors {
-        transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
-        transition-duration: 150ms;
-        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .duration-200 {
-        transition-duration: 200ms;
-    }
-</style>

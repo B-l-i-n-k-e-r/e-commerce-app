@@ -15,11 +15,12 @@ use Illuminate\Support\Facades\Log;
 class ProductController extends BaseController
 {
     // 1. Product Listing and Details
-    public function index()
-    {
-        $products = Product::all();
-        return view('products.index', compact('products'));
-    }
+public function index()
+{
+    // This returns a LengthAwarePaginator which HAS the links() method
+    $products = Product::paginate(10); 
+    return view('products.index', compact('products'));
+}
 
     public function show($id)
     {

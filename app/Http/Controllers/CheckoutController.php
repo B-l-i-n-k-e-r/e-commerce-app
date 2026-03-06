@@ -63,9 +63,7 @@ class CheckoutController extends Controller
         $order = null;
 
         DB::transaction(function () use ($request, $cart, $totalAmount, &$order) {
-            Log::info('Before Order Create');
-
-            // Create order with payment_method = null initially
+            // Create order record
             $order = Order::create([
                 'user_id' => Auth::id(),
                 'shipping_name' => $request->name,
@@ -76,8 +74,6 @@ class CheckoutController extends Controller
                 'status' => 'Pending',
                 'payment_method' => 'M-pesa',
             ]);
-
-            Log::info('Order Created', ['order_id' => $order->id]);
 
             // Create order items and reduce stock
             foreach ($cart as $productId => $item) {
@@ -93,19 +89,22 @@ class CheckoutController extends Controller
                 $product->save();
             }
 
-            // Store order info in session
+            // Store order info in session for the next steps
             session([
                 'order_id' => $order->id,
                 'cart_total' => $totalAmount,
             ]);
 
-            // Clear cart after order created
-            session()->forget('cart');
+            // NOTE: We do NOT clear the cart here anymore.
+            // If payment fails, the user can still see their items.
         });
+
+  if (!$order) {
+            return redirect()->back()->with('error', 'Failed to create order. Please try again.');
+        }
 
         return redirect()->route('payment.method', ['order_id' => $order->id]);
     }
-
     public function showPaymentPage($order_id = null)
     {
         $orderId = $order_id ?? session('order_id');
@@ -117,6 +116,10 @@ class CheckoutController extends Controller
         return view('payment', compact('order'));
     }
 
+    /**
+     * This processes the final status change. 
+     * We clear the cart here because the payment step is considered "finished."
+     */
     public function processOrder(Request $request)
     {
         $validatedData = $request->validate([
@@ -126,34 +129,82 @@ class CheckoutController extends Controller
         $orderId = session('order_id');
 
         if (!$orderId) {
-            return redirect()->route('checkout.index')->with('error', 'No order found. Please complete checkout again.');
+            return redirect()->route('checkout.index')->with('error', 'No order found.');
         }
 
         $order = Order::findOrFail($orderId);
-        $paymentMethod = $validatedData['payment_method'];
-
-        // Save payment method and update order status
-        $order->payment_method = $paymentMethod;
-        $order->status = 'completed'; // Or handle logic depending on payment success
+        
+        $order->payment_method = $validatedData['payment_method'];
+        $order->status = 'completed'; 
         $order->save();
-
-        // Clear session info after successful order processing
-        session()->forget(['cart', 'shipping_info', 'order_id', 'cart_total']);
 
         // Send order confirmation email
         Mail::to($order->email)->send(new OrderConfirmation($order));
+
+        // NOW we clear the session data
+        session()->forget(['cart', 'shipping_info', 'order_id', 'cart_total']);
 
         return redirect()->route('checkout.confirmation');
     }
 
     public function showConfirmation()
     {
+        // If the user gets here via a direct redirect from M-Pesa callback:
         $orderId = session('order_id');
+        
         if (!$orderId) {
-            return redirect()->route('products.index')->with('error', 'No order ID found for confirmation.');
+            return redirect()->route('products.index')->with('error', 'No order ID found.');
         }
 
         $order = Order::findOrFail($orderId);
+
+        // Safety net: Clear cart here if it wasn't cleared in processOrder
+        session()->forget(['cart', 'order_id', 'cart_total']);
+
         return view('checkout.confirmation', compact('order'));
     }
+
+    public function cancelOrder($order_id)
+{
+    $order = Order::with('items')->findOrFail($order_id);
+
+    // Only allow cancellation of pending orders
+    if ($order->status !== 'Pending') {
+        return redirect()->back()->with('error', 'Only pending orders can be canceled.');
+    }
+
+    DB::transaction(function () use ($order) {
+        // 1. Restore the stock for each product
+        foreach ($order->items as $item) {
+            $product = Product::find($item->product_id);
+            if ($product) {
+                $product->stock += $item->quantity;
+                $product->save();
+            }
+        }
+
+        // 2. Delete the order items and the order
+        // Alternatively, set status to 'Canceled' instead of deleting
+        $order->items()->delete();
+        $order->delete();
+
+        // 3. Clear the order_id from session but KEEP the cart
+        session()->forget(['order_id', 'cart_total']);
+    });
+
+    return redirect()->route('cart.view')->with('success', 'Order canceled and stock restored. You can now modify your cart.');
+}
+
+/**
+ * Check the status of an order for frontend polling.
+ */
+public function checkStatus($order_id)
+{
+    // We only need the status column to keep the response light
+    $order = Order::select('status')->findOrFail($order_id);
+    
+    return response()->json([
+        'status' => strtolower($order->status)
+    ]);
+}
 }

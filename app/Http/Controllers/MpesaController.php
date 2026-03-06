@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use App\Models\Order; // Ensure the model is imported
 
 class MpesaController extends Controller
 {
@@ -25,6 +26,9 @@ class MpesaController extends Controller
         $this->passkey = env('MPESA_PASSKEY');
     }
 
+    /**
+     * Get M-Pesa Access Token
+     */
     public function getAccessToken()
     {
         $response = Http::withBasicAuth($this->consumerKey, $this->consumerSecret)
@@ -35,18 +39,21 @@ class MpesaController extends Controller
 
     /**
      * Initiate STK Push
-     *
-     * @param Request $request
-     * @return JsonResponse|View|RedirectResponse
      */
-    public function stkPush(Request $request): JsonResponse|View|RedirectResponse
+    public function stkPush(Request $request)
     {
-        $accessToken = $this->getAccessToken()['access_token'];
+        $accessTokenResponse = $this->getAccessToken();
+        
+        if (!isset($accessTokenResponse['access_token'])) {
+            return back()->with('error', 'Failed to generate access token.');
+        }
 
+        $accessToken = $accessTokenResponse['access_token'];
         $timestamp = now()->format('YmdHis');
         $password = base64_encode($this->shortcode . $this->passkey . $timestamp);
 
-        $callbackUrl = env('MPESA_CALLBACK_URL');
+        // Fetch order with items and products for the receipt
+        $order = Order::with('items.product')->findOrFail($request->order_id);
 
         $payload = [
             "BusinessShortCode" => $this->shortcode,
@@ -57,39 +64,34 @@ class MpesaController extends Controller
             "PartyA" => $request->phone,
             "PartyB" => $this->shortcode,
             "PhoneNumber" => $request->phone,
-            "CallBackURL" => $callbackUrl,
-            "AccountReference" => "BokinceX",
-            "TransactionDesc" => "Order Payment"
+            "CallBackURL" => env('MPESA_CALLBACK_URL'),
+            "AccountReference" => "Order #" . $order->id,
+            "TransactionDesc" => "Payment for BokinceX"
         ];
 
-        $response = Http::withToken($accessToken)
-            ->post('https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest', $payload);
+        try {
+            $response = Http::timeout(60)->withToken($accessToken)
+                ->post('https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest', $payload);
 
-        $responseData = $response->json();
+            $responseData = $response->json();
 
-        if (isset($responseData['ResponseCode']) && $responseData['ResponseCode'] == '0') {
-            // Store phone and amount in session for possible later use or polling
-            session([
-                'phone_number' => $request->phone,
-                'amount' => $request->amount,
-            ]);
+            if (isset($responseData['ResponseCode']) && $responseData['ResponseCode'] == '0') {
+                $order->update(['merchant_request_id' => $responseData['MerchantRequestID']]);
 
-         return view('stk_success', [
-    'phone' => $request->phone,
-    'amount' => $request->amount,
-]);
+                // Redirect to receipt view with the $order variable
+                return view('stk_success', compact('order'));
+            }
 
+            return back()->with('error', $responseData['errorMessage'] ?? 'Push failed');
 
-        } else {
-            return back()->withErrors(['mpesa_error' => $responseData['errorMessage'] ?? 'STK Push request failed. Please try again.'])->withInput();
+        } catch (\Exception $e) {
+            Log::error('M-Pesa STK Push Error: ' . $e->getMessage());
+            return back()->with('error', 'Connection to M-Pesa timed out.');
         }
     }
 
     /**
      * M-Pesa callback to handle payment confirmation
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
      */
     public function mpesaCallback(Request $request): JsonResponse
     {
@@ -104,6 +106,12 @@ class MpesaController extends Controller
             $phone = $metadata->where('Name', 'PhoneNumber')->first()['Value'] ?? null;
             $amount = $metadata->where('Name', 'Amount')->first()['Value'] ?? null;
 
+            // Update order status if merchant_request_id matches
+            $order = Order::where('merchant_request_id', $data['MerchantRequestID'])->first();
+            if ($order) {
+                $order->update(['status' => 'Paid']);
+            }
+
             DB::table('mpesa_transactions')->insert([
                 'receipt_number' => $mpesaReceiptNumber,
                 'phone' => $phone,
@@ -112,54 +120,35 @@ class MpesaController extends Controller
                 'status' => 'Success'
             ]);
         } else {
-            $resultCode = $data['ResultCode'] ?? null;
-            $resultDesc = $data['ResultDesc'] ?? null;
-
             DB::table('mpesa_transactions')->insert([
                 'receipt_number' => null,
-                'phone' => null,
-                'amount' => null,
-                'transaction_date' => now(),
                 'status' => 'Failed',
-                'error_code' => $resultCode,
-                'error_message' => $resultDesc
+                'error_code' => $data['ResultCode'] ?? null,
+                'error_message' => $data['ResultDesc'] ?? null,
+                'transaction_date' => now(),
             ]);
         }
 
         return response()->json(['Response' => 'Callback received successfully'], 200);
     }
 
+    /**
+     * Manual confirmation logic (if needed)
+     */
     public function confirmTransaction(Request $request)
-{
-    $request->validate([
-        'mpesaMessage' => 'required|string',
-    ]);
+    {
+        $request->validate(['mpesaMessage' => 'required|string']);
 
-    $inputMessage = $request->input('mpesaMessage');
+        $inputMessage = $request->input('mpesaMessage');
+        $amount = session('cart_total'); // Using cart_total from your checkout logic
+        $accountRef = 'Order'; 
 
-    // Retrieve stored details from session
-    $amount = session('amount');
-    $accountRef = 'BokinceX'; // You can store this in session too if dynamic
-    $receipt = session('mpesa_receipt'); // Set this during callback if needed
+        $amountMatch = str_contains($inputMessage, (string)$amount);
+        
+        if ($amountMatch) {
+            return redirect()->route('checkout.confirmation')->with('success', 'Payment verified!');
+        }
 
-    if (!$amount || !$accountRef) {
-        return back()->withErrors(['mpesaMessage' => 'Transaction session expired. Please try again.']);
+        return back()->withErrors(['mpesaMessage' => 'The message does not match. Check the amount.']);
     }
-
-    // Check if message contains expected amount and account reference
-    $amountMatch = str_contains($inputMessage, (string)$amount) || str_contains($inputMessage, 'Ksh' . number_format($amount, 2));
-    $accountMatch = str_contains($inputMessage, $accountRef);
-    $receiptMatch = $receipt ? str_contains($inputMessage, $receipt) : true;
-
-    if ($amountMatch && $accountMatch && $receiptMatch) {
-        return redirect()->route('order.confirmation');
-    } else {
-        return back()->withErrors([
-            'mpesaMessage' => 'The M-Pesa confirmation message does not match your transaction. Please ensure you pasted the correct message.'
-        ])->withInput();
-    }
-}
-
-
-}
-
+} // End of Class

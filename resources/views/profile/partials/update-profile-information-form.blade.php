@@ -1,129 +1,70 @@
 @extends('layouts.app')
 
 @section('header')
-    <h2 class="font-semibold text-2xl text-gray-800 dark:text-gray-200 leading-tight">
-        {{ __('My Profile') }}
+    <h2 class="font-black text-2xl text-gray-900 dark:text-white leading-tight uppercase tracking-widest">
+        {{ __('Account Settings') }}
     </h2>
 @endsection
 
 @section('content')
-    <div class="py-12 bg-gray-100 dark:bg-gray-900 min-h-screen">
-        <div class="max-w-4xl mx-auto space-y-8">
+    <div class="py-12 bg-gray-50 dark:bg-gray-950 min-h-screen">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
 
-            {{-- Profile Picture Section --}}
-            <div class="bg-white dark:bg-gray-800 shadow overflow-hidden rounded-lg p-6">
-                <div class="flex items-center gap-6">
-                    <div class="flex-shrink-0">
-                        <img
-                            src="{{ Auth::user()->profile_photo_url }}"
-                            alt="Profile Photo"
-                            class="h-20 w-20 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700 shadow-md"
-                        >
-                    </div>
-                    <div>
-                        <form
-                            action="{{ route('profile.update.photo') }}"
-                            method="POST"
-                            enctype="multipart/form-data"
-                            class="flex items-center gap-2"
-                        >
-                            @csrf
-                            <input
-                                type="file"
-                                name="profile_photo"
-                                accept="image/*"
-                                class="hidden"
-                                id="profileImageInput"
-                                onchange="this.form.submit()"
+            {{-- Hero Profile Section --}}
+            <div class="bg-white dark:bg-gray-900 shadow-2xl rounded-3xl overflow-hidden border border-gray-100 dark:border-gray-800 transition-all duration-300">
+                <div class="h-32 bg-gradient-to-r from-blue-600 to-indigo-700 dark:from-blue-900 dark:to-indigo-950"></div>
+                <div class="px-8 pb-8">
+                    <div class="relative flex items-end -mt-16 mb-6">
+                        <div class="relative group">
+                            <img
+                                src="{{ Auth::user()->profile_photo_url }}"
+                                alt="Profile Photo"
+                                class="h-32 w-32 rounded-3xl object-cover ring-8 ring-white dark:ring-gray-900 shadow-2xl transition-transform group-hover:scale-105 duration-300"
                             >
-                            <label
-                                for="profileImageInput"
-                                class="inline-flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md shadow-md cursor-pointer transition-colors duration-200"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75v-2.25m-9-5.25v-4.5m0 0l-3-3m3 3l3-3m-3 7.5h.001M12 10.5a9.375 9.375 0 019-9.375h-1.5A7.5 7.5 0 0012 10.5z" />
-                                </svg>
-                                {{ __('Change Photo') }}
-                            </label>
-                        </form>
-                         <p class="text-gray-500 dark:text-gray-400 text-sm mt-2">Allowed types: jpg, png, gif. Max size: 2MB</p>
+                            <form action="{{ route('profile.update.photo') }}" method="POST" enctype="multipart/form-data" id="photoForm">
+                                @csrf
+                                <input type="file" name="profile_photo" id="profileImageInput" class="hidden" accept="image/*" onchange="this.form.submit()">
+                                <label for="profileImageInput" class="absolute -bottom-2 -right-2 bg-blue-600 hover:bg-blue-500 text-white p-2.5 rounded-xl shadow-xl cursor-pointer transition-all active:scale-90">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                </label>
+                            </form>
+                        </div>
+                        <div class="ml-6 mb-2">
+                            <h1 class="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">{{ Auth::user()->name }}</h1>
+                            <p class="text-sm font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">{{ Auth::user()->email }}</p>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {{-- Profile Info Section --}}
-            <div class="bg-white dark:bg-gray-800 shadow overflow-hidden rounded-lg">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                        {{ __('Profile Information') }}
-                    </h2>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        {{ __('Update your account\'s profile information and email address.') }}
-                    </p>
-                </div>
-                <div class="p-6">
+            {{-- Settings Grid --}}
+            <div class="space-y-8">
+                
+                {{-- Profile Information --}}
+                <x-card title="{{ __('Identity Details') }}" :open="true">
                     @include('profile.partials.update-profile-information-form')
-                </div>
-            </div>
+                </x-card>
 
-            {{-- Contact Info Section --}}
-            <div class="bg-white dark:bg-gray-800 shadow overflow-hidden rounded-lg">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                        {{ __('Contact Details') }}
-                    </h2>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        {{ __('Manage your contact information.') }}
-                    </p>
-                </div>
-                <div class="p-6">
+                {{-- Contact Details --}}
+                <x-card title="{{ __('Contact Methods') }}" :open="false">
                     @include('profile.partials.update-contact-information-form')
-                </div>
-            </div>
+                </x-card>
 
-            {{-- Change Password Section --}}
-            <div class="bg-white dark:bg-gray-800 shadow overflow-hidden rounded-lg">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                        {{ __('Update Password') }}
-                    </h2>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        {{ __('Ensure your account is using a long, random password to stay secure.') }}
-                    </p>
-                </div>
-                <div class="p-6">
+                {{-- Security --}}
+                <x-card title="{{ __('Security & Access') }}" :open="false">
                     @include('profile.partials.update-password-form')
-                </div>
-            </div>
+                </x-card>
 
-            {{-- Notification Settings Section --}}
-            <div class="bg-white dark:bg-gray-800 shadow overflow-hidden rounded-lg">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                        {{ __('Notification Preferences') }}
-                    </h2>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        {{ __('Manage your notification settings.') }}
-                    </p>
-                </div>
-                <div class="p-6">
+                {{-- Notifications --}}
+                <x-card title="{{ __('Notification Channels') }}" :open="false">
                     @include('profile.partials.notification-preferences-form')
-                </div>
-            </div>
+                </x-card>
 
-            {{-- Account Deletion Section --}}
-            <div class="bg-white dark:bg-gray-800 shadow overflow-hidden rounded-lg">
-                <div class="px-6 py-4 flex items-center justify-between">
-                    <div>
-                        <h2 class="text-xl font-semibold text-red-600 dark:text-red-400">
-                            {{ __('Delete Account') }}
-                        </h2>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                            {{ __('Permanently delete your account.') }}
-                        </p>
-                    </div>
+                {{-- Danger Zone --}}
+                <x-card title="{{ __('Destructive Actions') }}" :danger="true" :open="false">
                     @include('profile.partials.delete-user-form')
-                </div>
+                </x-card>
+
             </div>
         </div>
     </div>
