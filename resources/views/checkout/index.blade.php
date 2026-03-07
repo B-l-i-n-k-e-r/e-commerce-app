@@ -102,7 +102,7 @@
                                                 <option value="">-- Choose --</option>
                                                 <option value="mpesa">M-PESA</option>
                                                 <option value="card">Credit/Debit Card</option>
-                                                <option value="cod">Cash on Delivery</option>
+                                                <option value="cash">Cash on Delivery</option>
                                             </select>
                                             <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
                                                 <svg class="w-4 h-4 light:text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

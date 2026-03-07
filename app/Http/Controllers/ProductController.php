@@ -6,12 +6,15 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Category;
+use App\Models\User; // Added for notification targeting
 use Illuminate\Http\Request;
 use App\Mail\OrderConfirmation;
+use App\Notifications\NewOrderReceived; // Import the new Notification class
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification; // Added for sending to multiple users
 
 class ProductController extends BaseController
 {
@@ -271,7 +274,13 @@ class ProductController extends BaseController
             $order->payment_method = $paymentMethod;
             $order->save();
 
+            // 1. Send Email
             Mail::to($order->email)->send(new OrderConfirmation($order));
+
+            // 2. TRIGGER NOTIFICATION: Notify Admins and Managers
+            $staff = User::whereIn('role', ['admin', 'manager'])->get();
+            Notification::send($staff, new NewOrderReceived($order));
+
             session()->forget(['cart', 'shipping_info', 'order_id', 'cart_total']);
 
             return redirect()->route('checkout.confirmation');

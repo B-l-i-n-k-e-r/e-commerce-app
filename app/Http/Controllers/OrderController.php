@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
-use App\Models\CartItem;
+use App\Models\User;
+use App\Models\Product; // Added to fetch current prices
 use Auth;
 use Illuminate\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use App\Notifications\OrderStatusUpdated;
 
 class OrderController extends Controller
 {
@@ -30,9 +32,38 @@ class OrderController extends Controller
         return view('orders.index', compact('orders'));
     }
 
-    // Create new order WITHOUT payment_method
+    /**
+     * Manager/Admin method to update order status
+     */
+    public function updateStatus(Request $request, Order $order): RedirectResponse
+    {
+        if (!in_array(auth()->user()->role, ['admin', 'manager'])) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'status' => 'required|string|in:pending,processing,shipped,delivered,cancelled',
+        ]);
+
+        $order->status = $validated['status'];
+        $order->save();
+
+        $order->user->notify(new OrderStatusUpdated($order));
+
+        return back()->with('success', 'Order status updated and customer notified.');
+    }
+
+    /**
+     * Create new order using SESSION cart
+     */
     public function createOrder(Request $request): RedirectResponse
     {
+        $cart = session()->get('cart', []);
+
+        if (empty($cart)) {
+            return redirect()->back()->with('error', 'Your cart is empty.');
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'address' => 'required|string',
@@ -44,32 +75,27 @@ class OrderController extends Controller
         $order->shipping_name = $validated['name'];
         $order->shipping_address = $validated['address'];
         $order->contact_number = $validated['contact'];
-        $order->total_amount = $this->calculateTotalAmount();
+        $order->total_amount = $this->calculateTotalAmount($cart);
         $order->status = 'pending';
-        // payment_method NOT set here
         $order->save();
 
-        // Attach cart items to order
-        $cartItems = CartItem::where('user_id', Auth::id())->get();
-        foreach ($cartItems as $item) {
+        // Attach session items to the order
+        foreach ($cart as $id => $details) {
             $order->items()->create([
-                'product_id' => $item->product_id,
-                'quantity' => $item->quantity,
-                'price' => $item->price,
+                'product_id' => $id,
+                'quantity' => $details['quantity'],
+                'price' => $details['price'],
             ]);
         }
 
-        // Clear user's cart
-        $cartItems->each->delete();
+        // Clear the session cart
+        session()->forget('cart');
 
-        // Redirect to payment method selection form
         return redirect()->route('payment.method', ['order_id' => $order->id]);
     }
 
-    // Show payment method selection form
     public function showPaymentMethodForm(Order $order): View
     {
-        // Optionally, verify ownership here
         if ($order->user_id !== Auth::id()) {
             abort(403);
         }
@@ -77,7 +103,6 @@ class OrderController extends Controller
         return view('orders.payment_method', compact('order'));
     }
 
-    // Save payment method submitted by user
     public function savePaymentMethod(Request $request, Order $order): RedirectResponse
     {
         if ($order->user_id !== Auth::id()) {
@@ -91,21 +116,22 @@ class OrderController extends Controller
         $order->payment_method = $request->payment_method;
         $order->save();
 
-        // Redirect to confirmation or payment processing page
         return redirect()->route('orders.showConfirmation', $order->id)
                          ->with('success', 'Payment method saved successfully.');
     }
 
-    // Helper: Calculate total cart amount for logged-in user
-    private function calculateTotalAmount(): float
+    /**
+     * Helper: Calculate total from SESSION array
+     */
+    private function calculateTotalAmount(array $cart): float
     {
-        $cartItems = CartItem::where('user_id', Auth::id())->get();
-        return $cartItems->sum(function ($item) {
-            return $item->quantity * $item->price;
-        });
+        $total = 0;
+        foreach ($cart as $item) {
+            $total += $item['price'] * $item['quantity'];
+        }
+        return $total;
     }
 
-    // Show order details
     public function show(Order $order): View
     {
         if ($order->user_id !== Auth::id()) {
@@ -116,7 +142,6 @@ class OrderController extends Controller
         return view('orders.show', compact('order'));
     }
 
-    // Show order confirmation page
     public function showConfirmation(Order $order): View
     {
         if ($order->user_id !== Auth::id()) {
@@ -127,7 +152,6 @@ class OrderController extends Controller
         return view('orders.confirmation', compact('order'));
     }
 
-    // Archive an order (optional)
     public function archive(Request $request, Order $order): RedirectResponse
     {
         if ($order->user_id !== Auth::id()) {
@@ -137,7 +161,8 @@ class OrderController extends Controller
         $order->status = 'archived';
         $order->save();
 
+        $order->user->notify(new OrderStatusUpdated($order));
+
         return redirect()->route('orders.index')->with('success', 'Order archived successfully.');
     }
-    
 }
