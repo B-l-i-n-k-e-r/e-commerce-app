@@ -73,6 +73,29 @@
             padding-top: 10px;
         }
 
+        .status-badge {
+            background: #000;
+            color: #fff;
+            padding: 3px 8px;
+            font-size: 10px;
+            display: inline-block;
+            margin: 10px 0;
+            letter-spacing: 1px;
+        }
+
+        .store-info {
+            font-size: 10px;
+            margin-top: 10px;
+            line-height: 1.4;
+        }
+
+        .vat-info {
+            font-size: 10px;
+            border-top: 1px dashed #000;
+            margin-top: 10px;
+            padding-top: 5px;
+        }
+
         .no-print { 
             margin-top: 30px; 
             display: flex; 
@@ -109,6 +132,7 @@
                 padding: 5mm;
             } 
             .receipt-container::after { display: none; }
+            .status-badge { background: #000 !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
     </style>
 </head>
@@ -121,10 +145,17 @@
             <div class="dashed-line"></div>
         </div>
 
+        @if($order->status === 'completed' || $order->status === 'Paid' || $order->status === 'paid')
+            <div class="text-center">
+                <span class="status-badge">✓ PAID</span>
+            </div>
+        @endif
+
         <div style="font-size: 12px; line-height: 1.6;">
-            <p style="margin: 0;">TXN: <span class="bold">#{{ $order->id }}</span></p>
+            <p style="margin: 0;">TXN: <span class="bold">#{{ str_pad($order->id, 4, '0', STR_PAD_LEFT) }}</span></p>
             <p style="margin: 0;">DATE: {{ $order->created_at->format('d/m/Y H:i') }}</p>
             <p style="margin: 0;">CUST: {{ $order->shipping_name ?? $order->name }}</p>
+            <p style="margin: 0;">PHONE: {{ $order->contact_number }}</p>
         </div>
         
         <table class="items-table">
@@ -140,7 +171,7 @@
                 <tr>
                     <td class="col-item uppercase">{{ $item->product->name }}</td>
                     <td class="col-qty">{{ $item->quantity }}</td>
-                    <td class="col-total">{{ number_format($item->price * $item->quantity, 2) }}</td>
+                    <td class="col-total">KES {{ number_format($item->price * $item->quantity, 2) }}</td>
                 </tr>
                 @endforeach
             </tbody>
@@ -151,10 +182,20 @@
             <p class="bold" style="font-size: 24px; margin: 5px 0;">KES {{ number_format($order->total_amount, 2) }}</p>
         </div>
 
+        <div class="vat-info">
+            <p style="margin: 0;">VAT INCLUDED @ 16%: KES {{ number_format($order->total_amount * 0.16, 2) }}</p>
+        </div>
+
         <div class="dashed-line"></div>
         
         <div class="text-center" style="font-size: 11px; margin-top: 10px; line-height: 1.5;">
             <p>PAYMENT: <span class="bold">{{ strtoupper($order->payment_method) }}</span></p>
+            
+            <div class="store-info">
+                <p style="margin: 2px 0;">Tel: 0712 345 678</p>
+                <p style="margin: 2px 0;">Email: info@bokincex.co.ke</p>
+            </div>
+            
             <p style="margin-top: 10px; font-style: italic;">Thank you for your business!</p>
             <p class="bold" style="margin-top: 5px;">WWW.BOKINCEX.CO.KE</p>
         </div>
@@ -165,5 +206,11 @@
         <a href="{{ route('checkout.confirmation', ['order_id' => $order->id]) }}" class="btn btn-confirm">Finish & Confirm</a>
     </div>
 
+    <script>
+        // Auto-open print dialog after 1 second
+        setTimeout(() => {
+            window.print();
+        }, 1000);
+    </script>
 </body>
 </html>

@@ -41,5 +41,15 @@ return [
     'inbox_id' => env('MAILTRAP_INBOX_ID'),
 ],
 
+// ... other services like slack and mailtrap
 
-];
+    'mpesa' => [
+        'key' => env('MPESA_CONSUMER_KEY'),
+        'secret' => env('MPESA_CONSUMER_SECRET'),
+        'shortcode' => env('MPESA_SHORTCODE'),
+        'passkey' => env('MPESA_PASSKEY'),
+        'callback' => env('MPESA_CALLBACK_URL'),
+        'env' => env('MPESA_ENVIRONMENT', 'sandbox'),
+    ],
+
+]; // End of file

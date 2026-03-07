@@ -6,14 +6,27 @@
         <div class="max-w-4xl mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-700">
             
             {{-- Success Header Banner --}}
-            <div class="bg-green-600 p-8 text-center">
+            <div class="{{ strtolower($order->status) === 'pending' ? 'bg-blue-600' : 'bg-green-600' }} p-8 text-center transition-colors duration-500">
                 <div class="inline-flex items-center justify-center w-16 h-16 bg-white/20 rounded-full mb-4">
-                    <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
-                    </svg>
+                    @if(strtolower($order->status) === 'pending')
+                        {{-- Loading/Spinner Icon for Pending --}}
+                        <svg class="w-10 h-10 text-white animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    @else
+                        {{-- Success Checkmark --}}
+                        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                    @endif
                 </div>
-                <h1 class="text-3xl font-black text-white uppercase tracking-tight italic">{{ __('Order Confirmed!') }}</h1>
-                <p class="text-green-100 mt-2 font-medium">Your request is being processed. Thank you for choosing BokinceX.</p>
+                <h1 class="text-3xl font-black text-white uppercase tracking-tight italic">
+                    {{ strtolower($order->status) === 'pending' ? __('Order Processing...') : __('Order Confirmed!') }}
+                </h1>
+                <p class="text-green-100 mt-2 font-medium">
+                    {{ strtolower($order->status) === 'pending' ? 'We are waiting for your payment confirmation.' : 'Your request is being processed. Thank you for choosing BokinceX.' }}
+                </p>
             </div>
 
             <div class="p-8">
@@ -30,7 +43,7 @@
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-500 dark:text-gray-400 text-sm">Status:</span>
-                                <span class="px-2 py-0.5 rounded text-[10px] font-black bg-yellow-100 text-yellow-700 uppercase tracking-tighter">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter {{ strtolower($order->status) === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700' }}">
                                     {{ $order->status }}
                                 </span>
                             </div>
@@ -119,4 +132,34 @@
             &copy; 2026 BokinceX E-Commerce Portal
         </p>
     </div>
+
+    {{-- Auto-refresh script for Pending orders --}}
+    @if(strtolower($order->status) === 'pending')
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const orderId = "{{ $order->id }}";
+                const checkStatusUrl = "{{ route('order.status', ['order_id' => ':id']) }}".replace(':id', orderId);
+
+                const statusInterval = setInterval(() => {
+                    fetch(checkStatusUrl, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status && data.status !== 'pending') {
+                            clearInterval(statusInterval);
+                            window.location.reload();
+                        }
+                    })
+                    .catch(error => console.error('Polling error:', error));
+                }, 3000);
+
+                // Timeout after 10 minutes
+                setTimeout(() => clearInterval(statusInterval), 600000);
+            });
+        </script>
+    @endif
 @endsection

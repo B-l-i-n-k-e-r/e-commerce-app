@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\Category;
 use Illuminate\Http\Request;
 use App\Mail\OrderConfirmation;
 use Illuminate\Support\Facades\Mail;
@@ -14,13 +15,30 @@ use Illuminate\Support\Facades\Log;
 
 class ProductController extends BaseController
 {
-    // 1. Product Listing and Details
-public function index()
-{
-    // This returns a LengthAwarePaginator which HAS the links() method
-    $products = Product::paginate(10); 
-    return view('products.index', compact('products'));
-}
+    /**
+     * 1. Product Listing and Details
+     */
+    public function index(Request $request)
+    {
+        $query = Product::query();
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('category')) {
+            $query->where('category_id', $request->category);
+        }
+
+        $products = $query->paginate(12);
+        $categories = Category::all();
+
+        return view('products.index', compact('products', 'categories'));
+    }
 
     public function show($id)
     {
@@ -28,7 +46,11 @@ public function index()
         return view('products.show', compact('product'));
     }
 
-    // 2. Cart Management
+    /**
+     * 2. Cart Management
+     */
+    
+    // Standard Redirect Add to Cart
     public function addToCart(Request $request, $id)
     {
         $product = Product::find($id);
@@ -52,7 +74,43 @@ public function index()
         }
 
         session()->put('cart', $cart);
+        $this->updateCartTotal();
+
         return redirect()->route('products.show', $id)->with('success', 'Product added to cart successfully!');
+    }
+
+    // AJAX Add to Cart (for Home/Listing pages)
+    public function addToCartAjax(Request $request, $id)
+    {
+        $product = Product::find($id);
+
+        if (!$product) {
+            return response()->json(['success' => false, 'message' => 'Product not found.'], 404);
+        }
+
+        $cart = session()->get('cart', []);
+
+        if (isset($cart[$id])) {
+            $cart[$id]['quantity']++;
+        } else {
+            $cart[$id] = [
+                'product_code' => $product->id,
+                'name' => $product->name,
+                'quantity' => 1,
+                'price' => $product->price,
+                'image_url' => $product->image_url ?? null,
+            ];
+        }
+
+        session()->put('cart', $cart);
+        $this->updateCartTotal();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Added to cart!',
+            'count' => array_sum(array_column($cart, 'quantity')),
+            'ids' => array_keys($cart)
+        ]);
     }
 
     public function viewCart()
@@ -61,21 +119,30 @@ public function index()
         return view('cart.index', compact('cart'));
     }
 
-    public function updateCart(Request $request, $id)
+    // AJAX Quantity Update (for Cart Page)
+    public function updateQuantityAjax(Request $request, $id)
     {
         $request->validate([
             'quantity' => 'required|integer|min:1',
         ]);
+
         $cart = session()->get('cart', []);
 
         if (isset($cart[$id])) {
-            $cart[$id]['quantity'] = $request->input('quantity');
+            $cart[$id]['quantity'] = (int)$request->input('quantity');
             session()->put('cart', $cart);
             $this->updateCartTotal();
-            return redirect()->route('cart.view')->with('success', 'Cart updated successfully!');
+
+            return response()->json([
+                'success' => true,
+                'subtotal' => $cart[$id]['quantity'] * $cart[$id]['price'],
+                'total' => session('cart_total', 0),
+                'count' => array_sum(array_column($cart, 'quantity')),
+                'ids' => array_keys($cart)
+            ]);
         }
 
-        return redirect()->route('cart.view')->with('error', 'Product not found in cart.');
+        return response()->json(['success' => false, 'message' => 'Product not found in cart.'], 404);
     }
 
     public function removeFromCart($id)
@@ -92,31 +159,14 @@ public function index()
         return redirect()->route('cart.view')->with('error', 'Product not found in cart.');
     }
 
-    public function updateQuantityAjax(Request $request, $id)
-{
-    $request->validate([
-        'quantity' => 'required|integer|min:1',
-    ]);
-    $cart = session()->get('cart', []);
-
-
-    if (isset($cart[$id])) {
-        $quantity = $request->input('quantity');
-        $cart[$id]['quantity'] = $quantity;
-        session()->put('cart', $cart);
-        $this->updateCartTotal();
-
-        $subtotal = $cart[$id]['quantity'] * $cart[$id]['price'];
-
+    public function getCartCount()
+    {
+        $cart = session()->get('cart', []);
         return response()->json([
-            'success' => true,
-            'subtotal' => $subtotal,
-            'total' => session('cart_total', 0),
+            'count' => array_sum(array_column($cart, 'quantity')),
+            'ids' => array_keys($cart)
         ]);
     }
-
-    return response()->json(['success' => false, 'message' => 'Product not found in cart.'], 404);
-}
 
     private function updateCartTotal()
     {
@@ -128,13 +178,15 @@ public function index()
         session(['cart_total' => $total]);
     }
 
-    // 3. Checkout Process
+    /**
+     * 3. Checkout Process
+     */
     public function checkout()
     {
         $cart = session()->get('cart');
 
         if (empty($cart)) {
-            return redirect()->route('products.index')->with('warning', 'Your cart is empty. Please add items to checkout.');
+            return redirect()->route('products.index')->with('warning', 'Your cart is empty.');
         }
 
         $this->updateCartTotal();
@@ -159,6 +211,7 @@ public function index()
 
         try {
             DB::beginTransaction();
+
             $order = new Order();
             $order->user_id = auth()->id();
             $order->total_amount = $totalAmount;
@@ -183,53 +236,23 @@ public function index()
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Error creating order: ' . $e->getMessage());
-            return redirect()->route('checkout.index')->with('error', 'Failed to create order. Please try again.');
+            return redirect()->route('checkout.index')->with('error', 'Failed to create order.');
         }
+
         return redirect()->route('checkout.payment');
-    }
-
-    private function simulatePayment($paymentMethod)
-    {
-        switch ($paymentMethod) {
-            case 'credit_card':
-                return rand(1, 100) <= 90;
-            case 'paypal':
-                return rand(1, 100) <= 80;
-            case 'mpesa':
-                return rand(1, 100) <= 95;
-            default:
-                return false;
-        }
-    }
-
-    public function showOrderConfirmation()
-    {
-        $orderId = session('order_id');
-        if (!$orderId) {
-            return redirect()->route('products.index')->with('error', 'No order ID found. Please complete the checkout process.');
-        }
-        $order = Order::findOrFail($orderId);
-        return view('checkout.confirmation', compact('order'));
     }
 
     public function showPaymentOptions()
     {
         $orderId = session('order_id');
-
-        if (!$orderId) {
-            return redirect()->route('checkout.index')->with('error', 'No order found. Please complete checkout again.');
-        }
+        if (!$orderId) return redirect()->route('checkout.index');
 
         $order = Order::findOrFail($orderId);
-        $cart = session()->get('cart');
-        $shippingInfo = session()->get('shipping_info');
-        $total = session('cart_total', 0);
-
         return view('checkout.payment', [
             'order' => $order,
-            'cartItems' => $cart,
-            'shippingInfo' => $shippingInfo,
-            'total' => $total,
+            'cartItems' => session()->get('cart'),
+            'shippingInfo' => session()->get('shipping_info'),
+            'total' => session('cart_total', 0),
         ]);
     }
 
@@ -240,33 +263,37 @@ public function index()
         ]);
 
         $orderId = session('order_id');
-        if (!$orderId) {
-            return redirect()->route('checkout.payment')->with('error', 'No order found. Please complete checkout again.');
-        }
-
         $order = Order::findOrFail($orderId);
         $paymentMethod = $validatedData['payment_method'];
-        $totalAmount = session('cart_total', 0);
 
-        $paymentSuccessful = $this->simulatePayment($paymentMethod);
-
-        if ($paymentSuccessful) {
+        if ($this->simulatePayment($paymentMethod)) {
             $order->status = 'completed';
             $order->payment_method = $paymentMethod;
             $order->save();
 
             Mail::to($order->email)->send(new OrderConfirmation($order));
-
             session()->forget(['cart', 'shipping_info', 'order_id', 'cart_total']);
 
             return redirect()->route('checkout.confirmation');
         } else {
             $order->status = 'failed';
-            $order->payment_method = $paymentMethod;
             $order->save();
-
-            return redirect()->route('checkout.payment')->with('error', 'Payment failed. Please try a different payment method.');
+            return redirect()->route('checkout.payment')->with('error', 'Payment failed.');
         }
     }
-    
+
+    public function showOrderConfirmation()
+    {
+        $orderId = session('order_id');
+        if (!$orderId) return redirect()->route('products.index');
+        
+        $order = Order::findOrFail($orderId);
+        return view('checkout.confirmation', compact('order'));
+    }
+
+    private function simulatePayment($paymentMethod)
+    {
+        $rates = ['credit_card' => 90, 'paypal' => 80, 'mpesa' => 95];
+        return rand(1, 100) <= ($rates[$paymentMethod] ?? 0);
+    }
 }

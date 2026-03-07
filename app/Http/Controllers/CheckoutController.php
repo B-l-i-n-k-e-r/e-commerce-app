@@ -43,6 +43,9 @@ class CheckoutController extends Controller
     public function createOrder(Request $request)
     {
         if (!Auth::check()) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'You must be logged in.'], 401);
+            }
             return redirect()->route('login')->with('error', 'You must be logged in to place an order.');
         }
 
@@ -51,18 +54,23 @@ class CheckoutController extends Controller
             'email' => 'required|email|max:255',
             'address' => 'required|string|max:500',
             'contact' => 'required|string|max:20',
+            'payment_method' => 'required|string|in:mpesa,card,cash',
         ]);
 
         $cart = session()->get('cart', []);
         if (empty($cart)) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'Your cart is empty.'], 400);
+            }
             return redirect()->route('cart.view')->with('error', 'Your cart is empty.');
         }
 
         $totalAmount = collect($cart)->sum(fn($item) => $item['quantity'] * $item['price']);
-
         $order = null;
 
-        DB::transaction(function () use ($request, $cart, $totalAmount, &$order) {
+        try {
+            DB::beginTransaction();
+
             // Create order record
             $order = Order::create([
                 'user_id' => Auth::id(),
@@ -72,7 +80,7 @@ class CheckoutController extends Controller
                 'email' => $request->email,
                 'total_amount' => $totalAmount,
                 'status' => 'Pending',
-                'payment_method' => 'M-pesa',
+                'payment_method' => $request->payment_method, // Use the selected method
             ]);
 
             // Create order items and reduce stock
@@ -95,16 +103,49 @@ class CheckoutController extends Controller
                 'cart_total' => $totalAmount,
             ]);
 
-            // NOTE: We do NOT clear the cart here anymore.
-            // If payment fails, the user can still see their items.
-        });
+            DB::commit();
 
-  if (!$order) {
+            // For non-MPESA payments, clear cart immediately
+            if ($request->payment_method !== 'mpesa') {
+                session()->forget(['cart']);
+                
+                // Send confirmation email for non-MPESA payments
+                Mail::to($order->email)->send(new OrderConfirmation($order));
+            }
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'order_id' => $order->id,
+                    'payment_method' => $request->payment_method,
+                    'redirect' => $request->payment_method === 'mpesa' 
+                        ? route('payment.method', ['order_id' => $order->id])
+                        : route('checkout.confirmation', ['order_id' => $order->id])
+                ]);
+            }
+
+            // Fallback for non-AJAX requests
+            if ($request->payment_method === 'mpesa') {
+                return redirect()->route('payment.method', ['order_id' => $order->id]);
+            } else {
+                return redirect()->route('checkout.confirmation', ['order_id' => $order->id]);
+            }
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Order creation error: ' . $e->getMessage());
+            
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to create order. Please try again.'
+                ], 500);
+            }
+            
             return redirect()->back()->with('error', 'Failed to create order. Please try again.');
         }
-
-        return redirect()->route('payment.method', ['order_id' => $order->id]);
     }
+
     public function showPaymentPage($order_id = null)
     {
         $orderId = $order_id ?? session('order_id');
@@ -144,67 +185,69 @@ class CheckoutController extends Controller
         // NOW we clear the session data
         session()->forget(['cart', 'shipping_info', 'order_id', 'cart_total']);
 
-        return redirect()->route('checkout.confirmation');
+        return redirect()->route('checkout.confirmation', ['order_id' => $order->id]);
     }
 
-    public function showConfirmation()
-    {
-        // If the user gets here via a direct redirect from M-Pesa callback:
-        $orderId = session('order_id');
-        
-        if (!$orderId) {
-            return redirect()->route('products.index')->with('error', 'No order ID found.');
-        }
-
-        $order = Order::findOrFail($orderId);
-
-        // Safety net: Clear cart here if it wasn't cleared in processOrder
-        session()->forget(['cart', 'order_id', 'cart_total']);
-
-        return view('checkout.confirmation', compact('order'));
+    public function showConfirmation($order_id = null)
+{
+    // 1. Determine the Order ID from the URL or the session
+    $orderId = $order_id ?? session('order_id');
+    
+    if (!$orderId) {
+        return redirect()->route('products.index')->with('error', 'No order ID found.');
     }
+
+    // 2. Fetch the order details
+    $order = Order::with('items.product')->findOrFail($orderId);
+
+    // 3. Clear EVERYTHING related to the previous purchase
+    // This ensures the cart is empty and session variables are reset
+    session()->forget(['cart', 'order_id', 'cart_total', 'shipping_info']);
+
+    return view('checkout.confirmation', compact('order'));
+}
 
     public function cancelOrder($order_id)
-{
-    $order = Order::with('items')->findOrFail($order_id);
+    {
+        $order = Order::with('items')->findOrFail($order_id);
 
-    // Only allow cancellation of pending orders
-    if ($order->status !== 'Pending') {
-        return redirect()->back()->with('error', 'Only pending orders can be canceled.');
-    }
-
-    DB::transaction(function () use ($order) {
-        // 1. Restore the stock for each product
-        foreach ($order->items as $item) {
-            $product = Product::find($item->product_id);
-            if ($product) {
-                $product->stock += $item->quantity;
-                $product->save();
-            }
+        // Only allow cancellation of pending orders
+        if ($order->status !== 'Pending') {
+            return redirect()->back()->with('error', 'Only pending orders can be canceled.');
         }
 
-        // 2. Delete the order items and the order
-        // Alternatively, set status to 'Canceled' instead of deleting
-        $order->items()->delete();
-        $order->delete();
+        DB::transaction(function () use ($order) {
+            // 1. Restore the stock for each product
+            foreach ($order->items as $item) {
+                $product = Product::find($item->product_id);
+                if ($product) {
+                    $product->stock += $item->quantity;
+                    $product->save();
+                }
+            }
 
-        // 3. Clear the order_id from session but KEEP the cart
-        session()->forget(['order_id', 'cart_total']);
-    });
+            // 2. Delete the order items and the order
+            // Alternatively, set status to 'Canceled' instead of deleting
+            $order->items()->delete();
+            $order->delete();
 
-    return redirect()->route('cart.view')->with('success', 'Order canceled and stock restored. You can now modify your cart.');
-}
+            // 3. Clear the order_id from session but KEEP the cart
+            session()->forget(['order_id', 'cart_total']);
+        });
 
-/**
- * Check the status of an order for frontend polling.
- */
-public function checkStatus($order_id)
-{
-    // We only need the status column to keep the response light
-    $order = Order::select('status')->findOrFail($order_id);
-    
-    return response()->json([
-        'status' => strtolower($order->status)
-    ]);
-}
+        return redirect()->route('cart.view')->with('success', 'Order canceled and stock restored. You can now modify your cart.');
+    }
+
+    /**
+     * Check the status of an order for frontend polling.
+     */
+    public function checkStatus($order_id)
+    {
+        // We only need the status column to keep the response light
+        $order = Order::select('status')->findOrFail($order_id);
+        
+        return response()->json([
+            'status' => strtolower($order->status)
+        ]);
+    }
 }

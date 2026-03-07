@@ -23,6 +23,9 @@ use App\Http\Controllers\PHPMailerController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Manager\ManagerDashboardController;
+use App\Http\Controllers\CategoryController;
+use App\Models\Product;
+
 
 // ========================= M-PESA ROUTES =========================
 Route::get('/mpesa/test-token', [MpesaController::class, 'getAccessToken']);
@@ -30,33 +33,58 @@ Route::post('/mpesa/stk-push', [MpesaController::class, 'stkPush'])->name('stkpu
 Route::post('/mpesa/callback', [MpesaController::class, 'handleCallback'])->name('mpesa.callback');
 
 // ========================= PUBLIC PRODUCT ROUTES =========================
+// Homepage
 Route::get('/', function () {
-    return view('welcome');
+    // Fetch all products with their categories to make the filter work
+    $products = Product::with('category')->get();
+    
+    return view('welcome', compact('products'));
 });
+
 Route::get('/products', [ProductController::class, 'index'])->name('products.index');
 Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show');
 
 // ========================= CART ROUTES =========================
 Route::prefix('cart')->name('cart.')->group(function () {
     Route::get('/', [ProductController::class, 'viewCart'])->name('view');
+    
+    // Standard Redirect route
     Route::post('/add/{id}', [ProductController::class, 'addToCart'])->name('add');
+    
+    // NEW: AJAX route for Quick Add
+    Route::post('/add-ajax/{id}', [ProductController::class, 'addToCartAjax'])->name('add.ajax');
+    // Inside the 'cart' prefix group in web.php
+Route::post('/add-ajax/{id}', [ProductController::class, 'addToCartAjax'])->name('add.ajax');
     Route::post('/update/{id}', [ProductController::class, 'updateCart'])->name('update');
     Route::post('/update-quantity/{id}', [ProductController::class, 'updateQuantityAjax'])->name('update-quantity');
     Route::delete('/remove/{id}', [ProductController::class, 'removeFromCart'])->name('remove');
+    Route::get('/count', [ProductController::class, 'getCartCount'])->name('count');
 });
 
-// ========================= AUTH ROUTES =========================
-Auth::routes(['verify' => true]);
-
 // ========================= PASSWORD RESET ROUTES =========================
-// Fixed: Ensure these are outside restricted middleware so users can access them while logged out
-Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])->name('password.reset');
+// Place these BEFORE Auth::routes() to ensure they take precedence
+// Allow GET request for reset form (accessible even when logged in)
+Route::get('reset-password/{token}', function ($token) {
+    // Simple closure to bypass all middleware issues
+    return view('auth.reset-password', [
+        'token' => $token,
+        'email' => request('email')
+    ]);
+})->name('password.reset');
 
+// Forgot password routes (these should remain guest-only)
 Route::middleware('guest')->group(function () {
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
     Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])->name('password.email');
-    Route::post('reset-password', [NewPasswordController::class, 'store'])->name('password.store');
 });
+
+// POST route for resetting password - accessible to both guests AND authenticated users
+Route::post('reset-password', [NewPasswordController::class, 'store'])
+    ->name('password.store');
+
+// ========================= AUTH ROUTES =========================
+// Disable default reset routes since we're using custom ones
+Auth::routes(['verify' => true, 'reset' => false]);
 
 // ========================= AUTHENTICATED USER ROUTES =========================
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -80,7 +108,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/checkout/confirmation/{order_id?}', [CheckoutController::class, 'showConfirmation'])->name('checkout.confirmation');
     Route::get('/order/status/{order_id}', [CheckoutController::class, 'checkStatus'])->name('order.status');
     Route::delete('/order/cancel/{order_id}', [CheckoutController::class, 'cancelOrder'])->name('order.cancel');
-    
+    Route::post('/checkout/process-order', [CheckoutController::class, 'processOrder'])->name('checkout.processOrder');
+
     // Payment
     Route::get('/payment/{order_id}', [PaymentController::class, 'showPaymentPage'])->name('payment.method');
     Route::post('/payment/{order_id}', [PaymentController::class, 'processPayment'])->name('payment.process');
@@ -125,7 +154,10 @@ Route::middleware(['auth'])
         Route::post('/password-requests/{user}/approve', [AdminController::class, 'approvePasswordRequest'])->name('password.requests.approve');
         Route::post('/password-requests/{user}/reject', [AdminController::class, 'rejectPasswordRequest'])->name('password.requests.reject');
         Route::get('inventory/low-stock', [ProductAdminController::class, 'lowStock'])->name('inventory.low-stock');
-    });
+        
+        // Category
+        Route::resource('categories', CategoryController::class);   
+});
 
 // ========================= MANAGER SPECIFIC =========================
 Route::middleware(['auth', 'manager'])->group(function () {

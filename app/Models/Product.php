@@ -6,56 +6,64 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Category; // Added Category import
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class Product extends Model
 {
     use HasFactory;
 
-    // Fillable attributes for mass assignment
-    protected $fillable = ['name', 'description', 'price', 'stock', 'image_url'];
+    // 1. CRITICAL: Added 'category_id' so it can actually be saved to the database
+    protected $fillable = ['name', 'category_id', 'description', 'price', 'stock', 'image_url'];
 
     protected $casts = [
-        'price' => 'decimal:2', // Ensure price is treated as a decimal
+        'price' => 'decimal:2',
     ];
 
-    // Relationship: A product can belong to many orders
+    public function category()
+    {
+        return $this->belongsTo(Category::class);
+    }
+
     public function orders()
     {
         return $this->belongsToMany(Order::class, 'order_product');
     }
 
-    // Relationship: A product can have many order items
     public function orderItems()
     {
         return $this->hasMany(OrderItem::class);
     }
 
-    // Accessor for the price in Kenyan Shillings
+    /**
+     * Fix for Image Display:
+     * If you use this accessor, you DO NOT need to add 'storage/' in your Blade file.
+     * Simply use <img src="{{ $product->image_url }}">
+     */
+    public function getImageUrlAttribute($value)
+    {
+        if (!$value) {
+            return asset('images/placeholder.png'); // Optional: Add a default image
+        }
+        return asset('storage/' . $value);
+    }
+
     public function getPriceKesAttribute()
     {
         $exchangeRate = $this->getUsdToKesRate();
         return round($this->price * $exchangeRate, 2);
     }
 
-    // Private method to fetch the USD to KES exchange rate
     private function getUsdToKesRate()
     {
-        // Replace with your actual API key and endpoint
         try {
             $response = Http::get('https://api.exchangerate-api.com/v4/latest/USD');
             $data = $response->json();
             return $data['rates']['KES'] ?? config('app.usd_to_kes_fallback_rate', 120.00);
         } catch (\Exception $e) {
-            // Log the error for debugging
-            \Log::error('Error fetching USD to KES exchange rate: ' . $e->getMessage());
+            Log::error('Error fetching USD to KES exchange rate: ' . $e->getMessage());
             return config('app.usd_to_kes_fallback_rate', 120.00);
         }
-    }
-
-    // Get the full URL of the product image from the 'image_url' attribute
-    public function getImageUrlAttribute($value)
-    {
-        return asset('storage/' . $value);
     }
 }
