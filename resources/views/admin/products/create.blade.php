@@ -37,7 +37,7 @@
                         </svg>
                     </div>
                     <div>
-                        <h1 class="text-2xl font-black light:text-gray-900 dark:text-white uppercase tracking-tighter">Product Creation</h1>
+                        <h1 class="text-2xl font-black light:text-gray-900 dark:text-white uppercase tracking-tighter">New Product</h1>
                         <p class="text-xs font-medium light:text-gray-600 dark:text-gray-400 mt-1">Populate the fields below to add a new asset to your store.</p>
                     </div>
                 </div>
@@ -54,7 +54,7 @@
                             <svg class="w-3 h-3 light:text-purple-500 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                             </svg>
-                            Identification
+                            Name
                         </label>
                         <input type="text" 
                                class="w-full portal-input p-5 text-sm font-medium outline-none focus:ring-1 focus:ring-purple-600 placeholder:light:text-gray-400 placeholder:dark:text-gray-500" 
@@ -75,7 +75,7 @@
                             <svg class="w-3 h-3 light:text-blue-500 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/>
                             </svg>
-                            Categorization
+                            Category
                         </label>
                         <div class="relative">
                             <select id="category_id" name="category_id" required
@@ -104,7 +104,7 @@
                             <svg class="w-3 h-3 light:text-purple-500 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
                             </svg>
-                            Specifications & Story
+                            Description
                         </label>
                         <textarea class="w-full portal-input p-5 text-sm font-medium outline-none focus:ring-1 focus:ring-purple-600 min-h-[120px]" 
                                   id="description" name="description" rows="4" placeholder="Detail the features and benefits..." required>{{ old('description') }}</textarea>
@@ -120,7 +120,7 @@
                                 <svg class="w-3 h-3 light:text-blue-500 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
-                                Price Points
+                                Price
                             </label>
                             <div class="relative">
                                 <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
@@ -141,7 +141,7 @@
                                 <svg class="w-3 h-3 light:text-purple-500 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
                                 </svg>
-                                Inventory Count
+                                Quantity
                             </label>
                             <input type="number" min="0"
                                    class="w-full portal-input p-5 text-sm font-black outline-none focus:ring-1 focus:ring-purple-600" 
@@ -159,7 +159,7 @@
                                 <svg class="w-3 h-3 light:text-blue-500 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                 </svg>
-                                Visual Asset
+                                Media
                             </label>
                             
                             {{-- Image Preview Area --}}
@@ -194,7 +194,7 @@
                         <button type="submit" 
                                 class="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white text-[10px] font-black uppercase tracking-widest py-5 px-6 rounded-2xl shadow-xl shadow-purple-600/20 transition-all active:scale-95 group">
                             <span class="flex items-center justify-center gap-2">
-                                Publish Product
+                                Add Product
                                 <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
                                 </svg>
